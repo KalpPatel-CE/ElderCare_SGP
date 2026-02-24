@@ -1,5 +1,5 @@
 const pool = require('../db/db');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 exports.signup = async (req, res) => {
@@ -37,8 +37,8 @@ exports.login = async (req, res) => {
   try {
     const { user_code, password } = req.body;
 
-    if (!user_code || !password) {
-      return res.status(400).json({ error: 'User code and password are required' });
+    if (!user_code) {
+      return res.status(400).json({ error: 'User code is required' });
     }
 
     const result = await pool.query(
@@ -51,10 +51,15 @@ exports.login = async (req, res) => {
     }
 
     const user = result.rows[0];
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
-    if (!isValidPassword) {
-      return res.status(401).json({ error: 'Invalid password' });
+    // Support both old and new login
+    if (password && user.password_hash) {
+      const isValidPassword = await bcrypt.compare(password, user.password_hash);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: 'Invalid password' });
+      }
+    } else if (password && !user.password_hash) {
+      return res.status(401).json({ error: 'User has no password. Please signup.' });
     }
 
     const token = jwt.sign(

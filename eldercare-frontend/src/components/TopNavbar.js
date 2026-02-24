@@ -1,5 +1,6 @@
 function TopNavbar({ title }) {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : {};
 
   return (
     <div className="top-navbar">
@@ -8,7 +9,7 @@ function TopNavbar({ title }) {
       </div>
       <div className="navbar-user">
         <span className="user-role">
-          {user.user_code} • {user.role}
+          {user.user_code || 'User'} • {user.role || 'N/A'}
         </span>
       </div>
     </div>

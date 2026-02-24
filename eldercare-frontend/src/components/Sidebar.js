@@ -3,13 +3,13 @@ import { useNavigate, useLocation } from "react-router-dom";
 function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : {};
 
   const isActive = (path) => location.pathname === path;
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    localStorage.clear();
     navigate('/');
   };
 
@@ -18,7 +18,7 @@ function Sidebar() {
       <div className="sidebar-header">
         <div className="sidebar-title">Elder Care System</div>
         <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
-          {user.role?.toUpperCase()} Portal
+          {user.role?.toUpperCase() || 'USER'} Portal
         </div>
       </div>
       

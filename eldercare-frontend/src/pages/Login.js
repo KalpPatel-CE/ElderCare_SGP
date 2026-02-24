@@ -9,8 +9,8 @@ function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!formData.user_code.trim() || !formData.password.trim()) {
-      alert('Please enter user code and password');
+    if (!formData.user_code.trim()) {
+      alert('Please enter user code');
       return;
     }
 
@@ -50,10 +50,9 @@ function Login() {
           />
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Password (optional for old users)"
             value={formData.password}
             onChange={(e) => setFormData({...formData, password: e.target.value})}
-            required
             style={{ width: '100%', padding: '12px', marginBottom: '20px', border: '1px solid #ddd', borderRadius: '5px', fontSize: '14px', boxSizing: 'border-box' }}
           />
           <button 
