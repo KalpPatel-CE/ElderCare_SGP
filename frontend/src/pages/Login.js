@@ -12,60 +12,65 @@ function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const response = await api.post('/auth/login', { 
+        email, 
+        password 
+      });
       
       localStorage.clear();
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
-      const role = response.data.user.role;
-      if (role === 'admin') navigate('/admin');
-      else if (role === 'family') navigate('/family');
-      else if (role === 'caretaker') navigate('/caretaker');
+      const userRole = response.data.user.role;
+      if (userRole === 'admin') navigate('/admin');
+      else if (userRole === 'family') navigate('/family');
+      else if (userRole === 'caretaker') navigate('/caretaker');
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed');
     }
   };
 
   return (
-    <div className="auth-page page-fade-in">
-      <div className="auth-container">
-        <div className="auth-header">
-          <Link to="/" className="back-link">← Elder Care Home</Link>
-          <h1 className="auth-title">Welcome Back</h1>
-          <p className="auth-subtitle">Sign in to access your dashboard</p>
-        </div>
+    <div className="auth-page">
+      <div className="auth-card">
+        <h1 className="auth-title">Welcome back</h1>
+        <p className="auth-subtitle">Sign in to your ElderCare dashboard</p>
         
         <form onSubmit={handleLogin} className="auth-form">
-          {error && <div className="error-message">{error}</div>}
-          
-          <div className="form-group">
-            <label>Email</label>
+          <div className="form-field">
+            <label className="form-label">Email</label>
             <input
               type="email"
+              className="form-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
+              placeholder="Enter your email address"
               required
             />
           </div>
           
-          <div className="form-group">
-            <label>Password</label>
+          <div className="form-field">
+            <label className="form-label">Password</label>
             <input
               type="password"
+              className="form-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
+              required
             />
           </div>
           
-          <button type="submit" className="btn-primary btn-full">Sign In</button>
+          <button type="submit" className="btn-primary-full">Sign in</button>
           
-          <p className="auth-footer">
-            Don't have an account? <Link to="/signup" className="auth-link">Sign up</Link>
-          </p>
+          {error && (
+            <div className="error-message">{error}</div>
+          )}
         </form>
+        
+        <p className="auth-footer">
+          Don't have an account? <Link to="/signup" className="auth-link">Sign up</Link>
+        </p>
       </div>
     </div>
   );

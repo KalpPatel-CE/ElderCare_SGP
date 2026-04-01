@@ -1,214 +1,290 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import axios from 'axios';
 import './Landing.css';
 
 function Landing() {
-  const navigate = useNavigate();
+  const [testimonials, setTestimonials] = useState([]);
+  const [caretakers, setCaretakers] = useState([]);
 
   useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry, i) => {
-        if (entry.isIntersecting) {
-          const delay = entry.target.dataset.delay || 0;
-          setTimeout(() => {
-            entry.target.classList.add('visible');
-          }, delay);
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.15 });
-
-    document.querySelectorAll('.fade-in').forEach((el, i) => {
-      el.dataset.delay = (i % 3) * 100;
-      observer.observe(el);
-    });
-
-    const handleScroll = () => {
-      const nav = document.querySelector('.navbar');
-      if (nav) {
-        nav.style.boxShadow = window.scrollY > 20 ? '0 4px 24px rgba(13,79,92,0.08)' : 'none';
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('scroll', handleScroll);
-    };
+    axios.get('http://localhost:5000/auth/testimonials')
+      .then(res => setTestimonials(res.data))
+      .catch(err => console.error(err));
+    
+    axios.get('http://localhost:5000/admin/caretakers/available')
+      .then(res => setCaretakers(res.data.slice(0, 3)))
+      .catch(err => console.error(err));
   }, []);
+
+  const scrollToSection = (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
     <div className="landing-page">
+      {/* Navbar */}
       <nav className="navbar">
-        <a href="#" className="logo">
-          <div className="logo-icon">🏥</div>
-          <span>Elder Care System</span>
-        </a>
-        <ul className="nav-links">
-          <li><a href="#features">Features</a></li>
-          <li><a href="#how">How It Works</a></li>
-          <li><a href="#roles">User Roles</a></li>
-          <li><button className="cta-button" onClick={() => navigate('/login')}>Login</button></li>
-        </ul>
+        <div className="navbar-content">
+          <div className="navbar-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#0D6E6E" strokeWidth="2"/>
+              <path d="M12 8V12L14 14" stroke="#0D6E6E" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            <span>ElderCare</span>
+          </div>
+          <div className="navbar-links">
+            <a onClick={() => scrollToSection('services')}>Services</a>
+            <a onClick={() => scrollToSection('how-it-works')}>How It Works</a>
+            <a onClick={() => scrollToSection('caretakers')}>Our Caretakers</a>
+            <a onClick={() => scrollToSection('trust')}>Trust & Safety</a>
+            <a onClick={() => scrollToSection('contact')}>Contact</a>
+          </div>
+          <Link to="/signup" className="btn-get-started">Get Started</Link>
+        </div>
       </nav>
 
+      {/* Hero Section */}
       <section className="hero">
-        <div className="hero-content">
-          <div className="hero-badge">🌿 Built for SGP-2 · CSPIT, Charusat</div>
-          <h1 className="hero-title">Care That Never <em>Misses</em> a Beat</h1>
-          <p className="hero-subtitle">A complete health monitoring platform that helps family members and caretakers track medications, appointments, and daily activities for their elderly loved ones — all in one place.</p>
-          <div className="hero-buttons">
-            <button className="btn-primary" onClick={() => navigate('/signup')}>Get Started →</button>
-            <button className="btn-secondary" onClick={() => document.getElementById('features').scrollIntoView({ behavior: 'smooth' })}>Explore Features</button>
+        <div className="hero-container">
+          <div className="hero-left">
+            <h1 className="hero-title">Your Loved Ones Deserve the Best Care</h1>
+            <p className="hero-subtitle">
+              ElderCare connects families with background-verified, professionally trained caretakers. 
+              City-matched, company-employed, fully trustworthy.
+            </p>
+            <div className="hero-buttons">
+              <Link to="/signup" className="btn-hero-primary">Request a Caretaker →</Link>
+              <button onClick={() => scrollToSection('how-it-works')} className="btn-hero-outline">Learn More ↓</button>
+            </div>
+            <div className="trust-badges">
+              <div className="trust-badge">✓ Background Verified</div>
+              <div className="trust-badge">✓ Company Employed</div>
+              <div className="trust-badge">✓ City Matched</div>
+              <div className="trust-badge">✓ Daily Reports</div>
+            </div>
           </div>
-        </div>
-        <div className="hero-image">
-          <div className="mockup-container">
-            <div className="mockup-card">
-              <div className="mockup-dot"></div>
-              <div className="mockup-header">
-                <span className="mockup-title">Haribhai Patel</span>
-                <span className="mockup-badge">72 yrs · Male</span>
-              </div>
-              <div className="mockup-stats">
-                <div className="stat-box">
-                  <span className="num">3</span>
-                  <div className="lbl">Medications</div>
-                </div>
-                <div className="stat-box">
-                  <span className="num" style={{ color: 'var(--amber)' }}>2</span>
-                  <div className="lbl">Appointments</div>
-                </div>
-              </div>
-              <div className="mockup-med">
-                <div className="med-info">
-                  <div className="med-name">Metformin 500mg</div>
-                  <div className="med-time">Morning · Daily</div>
-                </div>
-                <span className="med-status-taken">Taken ✓</span>
-              </div>
-              <div className="mockup-med">
-                <div className="med-info">
-                  <div className="med-name">Insulin 10 units</div>
-                  <div className="med-time">Evening · Daily</div>
-                </div>
-                <span className="med-status-pending">Pending</span>
-              </div>
-              <div className="mockup-alert">
-                🔔 Cardiology appointment tomorrow at 10:00 AM
-              </div>
-            </div>
-            <div className="mockup-card-2">
-              <div className="label">Active Alerts</div>
-              <div className="val">0</div>
-              <div className="sub">All doses on track today</div>
-            </div>
+          <div className="hero-right">
+            <svg className="hero-illustration" viewBox="0 0 400 300" fill="none">
+              <circle cx="120" cy="80" r="40" fill="#FAF7F2"/>
+              <rect x="80" y="120" width="80" height="120" rx="10" fill="#0D6E6E" opacity="0.1"/>
+              <circle cx="280" cy="100" r="35" fill="#E8735A" opacity="0.2"/>
+              <path d="M240 140 L280 180 L320 140" stroke="#0D6E6E" strokeWidth="3" fill="none"/>
+              <circle cx="280" cy="200" r="20" fill="#FAF7F2"/>
+            </svg>
           </div>
         </div>
       </section>
 
+      {/* Stats Bar */}
       <section className="stats-bar">
-        <div className="stat-item">
-          <span className="stat-number">3</span>
-          <div className="stat-label">Distinct User Roles</div>
-        </div>
-        <div className="stat-item">
-          <span className="stat-number">Real-Time</span>
-          <div className="stat-label">Alerts & Notifications</div>
-        </div>
-        <div className="stat-item">
-          <span className="stat-number">Zero</span>
-          <div className="stat-label">Missed Doses Goal</div>
+        <div className="stats-container">
+          <div className="stat-item">
+            <div className="stat-number">500+</div>
+            <div className="stat-label">Families Served</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-number">50+</div>
+            <div className="stat-label">Verified Caretakers</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-number">4</div>
+            <div className="stat-label">Cities — Ahmedabad, Surat, Vadodara, Rajkot</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-number">4.8★</div>
+            <div className="stat-label">Average Rating</div>
+          </div>
         </div>
       </section>
 
-      <section className="features" id="features">
-        <div className="section-label">What We Offer</div>
-        <h2 className="section-title">Everything You Need to<br/>Monitor Elder Care</h2>
-        <p className="section-sub">From medication reminders to appointment tracking — all the tools caregivers need in a single, easy-to-use dashboard.</p>
+      {/* How It Works */}
+      <section id="how-it-works" className="how-it-works">
+        <h2 className="section-title">How It Works</h2>
+        <div className="steps-container">
+          <div className="step-card">
+            <div className="step-number">1</div>
+            <div className="step-icon">📝</div>
+            <h3 className="step-title">Create Your Profile</h3>
+            <p className="step-desc">Register and set up your elder's medical history and daily routine</p>
+          </div>
+          <div className="step-card">
+            <div className="step-number">2</div>
+            <div className="step-icon">📋</div>
+            <h3 className="step-title">Submit a Request</h3>
+            <p className="step-desc">Tell us the service dates, meal plan, and home instructions</p>
+          </div>
+          <div className="step-card">
+            <div className="step-number">3</div>
+            <div className="step-icon">🔍</div>
+            <h3 className="step-title">We Find the Match</h3>
+            <p className="step-desc">Admin assigns a verified caretaker from your city</p>
+          </div>
+          <div className="step-card">
+            <div className="step-number">4</div>
+            <div className="step-icon">🏠</div>
+            <h3 className="step-title">Care Begins</h3>
+            <p className="step-desc">Your caretaker arrives informed and prepared</p>
+          </div>
+          <div className="step-card">
+            <div className="step-number">5</div>
+            <div className="step-icon">📊</div>
+            <h3 className="step-title">Daily Updates</h3>
+            <p className="step-desc">Receive daily care logs and vitals reports</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Why Choose ElderCare */}
+      <section id="services" className="why-choose">
+        <h2 className="section-title">Why Choose ElderCare</h2>
         <div className="features-grid">
-          {[
-            { icon: '💊', title: 'Medication Tracking', desc: 'Schedule medications with dosage, frequency, and date range. Mark doses as taken or missed and keep a complete intake history.' },
-            { icon: '📅', title: 'Appointment Management', desc: 'Add doctor visits with hospital name, department, and time. Never miss an upcoming appointment with timely reminders.' },
-            { icon: '🏃', title: 'Daily Activity Monitoring', desc: 'Log and track daily activities like walking, meditation, and exercises. Keep a running record of the elder\'s wellness routines.' },
-            { icon: '🔐', title: 'Role-Based Access', desc: 'Separate portals for Admin, Family, and Caretaker — each with tailored permissions and views designed for their specific needs.' },
-            { icon: '🔔', title: 'Alert Notifications', desc: 'Automatic alerts when a dose is missed, an appointment is skipped, or no activity has been recorded for the day.' },
-            { icon: '📊', title: 'Activity Reports', desc: 'Daily and weekly summaries of medication adherence, appointment attendance, and activity logs to identify care patterns.' }
-          ].map((feature, i) => (
-            <div key={i} className="feature-card fade-in">
-              <div className="feature-icon">{feature.icon}</div>
-              <h3 className="feature-title">{feature.title}</h3>
-              <p className="feature-description">{feature.desc}</p>
+          <div className="feature-card">
+            <div className="feature-icon">🛡️</div>
+            <h3 className="feature-title">Background Verified</h3>
+            <p className="feature-desc">Every caretaker undergoes police verification, ID proof check, and reference verification before joining our team</p>
+          </div>
+          <div className="feature-card">
+            <div className="feature-icon">🎓</div>
+            <h3 className="feature-title">Professionally Trained</h3>
+            <p className="feature-desc">All caretakers are certified in elderly care, first aid, and dementia/post-surgery support</p>
+          </div>
+          <div className="feature-card">
+            <div className="feature-icon">📍</div>
+            <h3 className="feature-title">City Matched</h3>
+            <p className="feature-desc">We only assign caretakers from your city — familiar with local hospitals, pharmacies, and routes</p>
+          </div>
+          <div className="feature-card">
+            <div className="feature-icon">👁️</div>
+            <h3 className="feature-title">Photo Verified</h3>
+            <p className="feature-desc">View your caretaker's photo and profile before they arrive. You decide who enters your home</p>
+          </div>
+          <div className="feature-card">
+            <div className="feature-icon">📋</div>
+            <h3 className="feature-title">Daily Reports</h3>
+            <p className="feature-desc">Receive detailed daily care logs including medications given, vitals recorded, meals served and observations</p>
+          </div>
+          <div className="feature-card">
+            <div className="feature-icon">⚖️</div>
+            <h3 className="feature-title">Legal Protection</h3>
+            <p className="feature-desc">Every service is covered by a signed service agreement protecting both the family and our caretakers</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Meet Our Caretakers */}
+      <section id="caretakers" className="meet-caretakers">
+        <h2 className="section-title">Meet Our Caretakers</h2>
+        <div className="caretakers-grid">
+          {caretakers.map(c => (
+            <div key={c.id} className="caretaker-card">
+              <div className="caretaker-photo">
+                {c.photo_url ? (
+                  <img src={`http://localhost:5000${c.photo_url}`} alt={c.full_name} />
+                ) : (
+                  <svg viewBox="0 0 100 100" fill="none">
+                    <circle cx="50" cy="50" r="50" fill="#FAF7F2"/>
+                    <circle cx="50" cy="35" r="15" fill="#0D6E6E"/>
+                    <path d="M25 75 Q50 60 75 75" fill="#0D6E6E"/>
+                  </svg>
+                )}
+              </div>
+              <h3 className="caretaker-name">{c.full_name}</h3>
+              <p className="caretaker-city">{c.city}</p>
+              <p className="caretaker-spec">{c.specialization}</p>
+              <div className="caretaker-meta">
+                <span className="experience-badge">{c.experience_years} years</span>
+                <span className="rating-badge">⭐ {c.rating}</span>
+              </div>
+              {c.background_check_status === 'verified' && (
+                <div className="verified-badge">Verified ✓</div>
+              )}
             </div>
           ))}
         </div>
       </section>
 
-      <section className="workflow" id="how">
-        <div className="section-label">Simple Process</div>
-        <h2 className="section-title">Up and Running in 3 Steps</h2>
-        <p className="section-sub">Getting started is straightforward — no technical knowledge required.</p>
-        <div className="workflow-steps">
-          {[
-            { num: '1', title: 'Register & Set Up Elder Profile', desc: 'Create an account and add your elderly loved one\'s basic profile including name, age, and gender.' },
-            { num: '2', title: 'Add Medications & Appointments', desc: 'Enter medication schedules with dosage details and add upcoming doctor appointments to the system.' },
-            { num: '3', title: 'Monitor & Receive Alerts', desc: 'Track daily activity on your dashboard and receive instant alerts whenever a dose or appointment is missed.' }
-          ].map((step, i) => (
-            <div key={i} className="workflow-step fade-in">
-              <div className="step-number">{step.num}</div>
-              <h3 className="step-title">{step.title}</h3>
-              <p className="step-description">{step.desc}</p>
+      {/* Testimonials */}
+      <section className="testimonials">
+        <h2 className="section-title">What Families Say</h2>
+        <div className="testimonials-grid">
+          {testimonials.map(t => (
+            <div key={t.id} className="testimonial-card">
+              <div className="quote-icon">"</div>
+              <p className="testimonial-message">{t.message}</p>
+              <div className="testimonial-footer">
+                <div className="testimonial-author">{t.family_name}</div>
+                <div className="testimonial-city">{t.city}</div>
+                <div className="testimonial-rating">{'⭐'.repeat(t.rating)}</div>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="roles" id="roles">
-        <div className="section-label">Who Uses It</div>
-        <h2 className="section-title">Three Roles, One Shared Goal</h2>
-        <p className="section-sub">Each user type has a dedicated portal designed around their specific responsibilities in the care ecosystem.</p>
-        <div className="roles-grid">
-          <div className="role-card admin fade-in">
-            <span className="role-icon">⚙️</span>
-            <h3 className="role-title">Admin</h3>
-            <p className="role-description">System-level oversight and user management for the entire platform.</p>
+      {/* Legal & Trust Section */}
+      <section id="trust" className="legal-trust">
+        <h2 className="section-title-light">Your Safety is Our Responsibility</h2>
+        <div className="legal-grid">
+          <div className="legal-card">
+            <h3 className="legal-title">Service Agreement</h3>
+            <p className="legal-desc">
+              Every booking is covered by a formal service agreement between ElderCare, the family, and the assigned caretaker. 
+              This agreement clearly defines duties, working hours, conduct rules, and liability.
+            </p>
           </div>
-          <div className="role-card family fade-in">
-            <span className="role-icon">👨👩👧</span>
-            <h3 className="role-title">Family Member</h3>
-            <p className="role-description">Stay connected with your loved one's daily health routine from anywhere.</p>
-          </div>
-          <div className="role-card caretaker fade-in">
-            <span className="role-icon">🩺</span>
-            <h3 className="role-title">Caretaker</h3>
-            <p className="role-description">Professional care management for multiple assigned elderly patients.</p>
+          <div className="legal-card">
+            <h3 className="legal-title">Our Commitment</h3>
+            <ul className="legal-list">
+              <li>Caretakers are company employees — not freelancers</li>
+              <li>Zero tolerance policy for misconduct</li>
+              <li>24/7 emergency support line</li>
+              <li>All caretakers carry company ID at all times</li>
+              <li>Families may request caretaker replacement at any time</li>
+            </ul>
           </div>
         </div>
+        <p className="legal-disclaimer">
+          ElderCare Services Pvt. Ltd. is registered under the Companies Act. Our caretakers are bound by a professional 
+          code of conduct and employment agreement. Any misconduct is subject to immediate termination and legal action.
+        </p>
       </section>
 
-      <section className="cta-banner">
-        <h2 className="cta-title">Start Monitoring Elder Care Today</h2>
-        <p className="cta-text">Join the system and give your loved ones the attentive care they deserve — powered by smart monitoring and real-time alerts.</p>
-        <button className="cta-button-large" onClick={() => navigate('/signup')}>Create Your Account →</button>
-      </section>
-
-      <footer className="footer">
+      {/* Footer */}
+      <footer id="contact" className="footer">
         <div className="footer-content">
-          <div className="footer-section">
-            <h3 className="footer-heading">🏥 Elder Care System</h3>
-            <p className="footer-text">Built for SGP-2 · Department of CE · CSPIT, Charusat University</p>
+          <div className="footer-left">
+            <div className="footer-logo">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#0D6E6E" strokeWidth="2"/>
+              </svg>
+              <span>ElderCare</span>
+            </div>
+            <p className="footer-tagline">Professional elderly care services you can trust</p>
           </div>
-          <div className="footer-section">
-            <h3 className="footer-heading">Project Team</h3>
-            <p className="footer-text">Kalp Patel · Yash Desai · Harsh Hirpara</p>
-          </div>
-          <div className="footer-section">
-            <h3 className="footer-heading">Academic Details</h3>
-            <p className="footer-text">Subject: SGP-2<br/>Guide: Ronak R Patel</p>
+          <div className="footer-links">
+            <div className="footer-column">
+              <h4>Company</h4>
+              <a href="#">About</a>
+              <a href="#">Services</a>
+              <a href="#">Cities</a>
+              <a href="#">Careers</a>
+            </div>
+            <div className="footer-column">
+              <h4>Legal</h4>
+              <Link to="/terms">Privacy Policy</Link>
+              <Link to="/terms">Terms of Service</Link>
+            </div>
+            <div className="footer-column">
+              <h4>Contact</h4>
+              <a href="mailto:support@eldercare.in">support@eldercare.in</a>
+              <a href="tel:+919999900000">+91 99999 00000</a>
+            </div>
           </div>
         </div>
         <div className="footer-bottom">
-          <p>&copy; 2024 Elder Care System. All rights reserved.</p>
+          <p className="footer-cities">Cities served: Ahmedabad | Surat | Vadodara | Rajkot</p>
+          <p className="footer-copyright">Copyright © 2026 ElderCare Services Pvt. Ltd.</p>
         </div>
       </footer>
     </div>

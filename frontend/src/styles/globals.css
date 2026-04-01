@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=DM+Sans:wght@400;500&display=swap');
+
+:root {
+  --teal-900: #04342C;
+  --teal-800: #085041;
+  --teal-600: #0F6E56;
+  --teal-400: #1D9E75;
+  --teal-100: #9FE1CB;
+  --teal-50:  #E1F5EE;
+
+  --amber-800: #633806;
+  --amber-600: #854F0B;
+  --amber-400: #BA7517;
+  --amber-200: #EF9F27;
+  --amber-100: #FAC775;
+  --amber-50:  #FAEEDA;
+
+  --red-800: #791F1F;
+  --red-600: #A32D2D;
+  --red-400: #E24B4A;
+  --red-50:  #FCEBEB;
+  --red-100: #F7C1C1;
+
+  --green-600: #3B6D11;
+  --green-400: #639922;
+  --green-50:  #EAF3DE;
+
+  --blue-800: #0C447C;
+  --blue-600: #185FA5;
+  --blue-50:  #E6F1FB;
+
+  --purple-800: #3C3489;
+  --purple-50:  #EEEDFE;
+
+  --gray-900: #1A1A18;
+  --gray-700: #444441;
+  --gray-500: #5F5E5A;
+  --gray-400: #888780;
+  --gray-200: #D3D1C7;
+  --gray-100: #F1EFE8;
+  --gray-50:  #FAF8F4;
+
+  --white: #FFFFFF;
+
+  --border-radius-sm: 6px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --border-radius-full: 9999px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: var(--gray-900);
+  background: var(--gray-50);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 500;
+}
+
+button {
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+input, select, textarea {
+  font-family: 'DM Sans', sans-serif;
+}

@@ -1,0 +1,34 @@
+.vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.vitals-cell {
+  background: var(--gray-50);
+  border-radius: var(--border-radius-md);
+  padding: 12px;
+  text-align: center;
+}
+
+.vitals-value {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--teal-600);
+  margin-bottom: 4px;
+}
+
+.vitals-value-abnormal {
+  color: var(--red-400);
+}
+
+.vitals-label {
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-bottom: 2px;
+}
+
+.vitals-unit {
+  font-size: 10px;
+  color: var(--gray-400);
+}

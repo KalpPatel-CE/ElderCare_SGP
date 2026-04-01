@@ -1,233 +1,670 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import StatusBadge from '../components/StatusBadge';
+import EmptyState from '../components/EmptyState';
+import SlidePanel from '../components/SlidePanel';
+import VitalsGrid from '../components/VitalsGrid';
+import AppointmentEntry from '../components/AppointmentEntry';
 import './FamilyDashboard.css';
 
 function FamilyDashboard() {
-  const [elders, setElders] = useState([]);
+  const [activeTab, setActiveTab] = useState('overview');
   const [user, setUser] = useState(null);
+  const [elder, setElder] = useState(null);
+  const [medications, setMedications] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [baselineVitals, setBaselineVitals] = useState(null);
+  const [requests, setRequests] = useState([]);
+  const [careLogs, setCareLogs] = useState([]);
+  const [showElderPanel, setShowElderPanel] = useState(false);
+  const [showMedicationPanel, setShowMedicationPanel] = useState(false);
+  const [showActivityPanel, setShowActivityPanel] = useState(false);
+  const [showVitalsPanel, setShowVitalsPanel] = useState(false);
+  const [showRequestPanel, setShowRequestPanel] = useState(false);
+  const [appointments, setAppointments] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    setUser(user);
-    fetchElders();
+    const userData = JSON.parse(localStorage.getItem('user'));
+    setUser(userData);
+    loadData();
   }, []);
 
-  const fetchElders = async () => {
+  const loadData = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const res = await api.get(`/elders/user/${user.user_code}`);
-      setElders(res.data);
+      const [elderRes, medsRes, actsRes, vitalsRes, reqsRes, logsRes] = await Promise.all([
+        api.get('/family/elder'),
+        api.get('/family/medications'),
+        api.get('/family/activities'),
+        api.get('/family/baseline-vitals'),
+        api.get('/family/requests'),
+        api.get('/family/care-logs')
+      ]);
+      setElder(elderRes.data);
+      setMedications(medsRes.data);
+      setActivities(actsRes.data);
+      setBaselineVitals(vitalsRes.data);
+      setRequests(reqsRes.data);
+      setCareLogs(logsRes.data);
     } catch (err) {
-      console.error('Error fetching elders:', err);
-      if (err.response?.status === 401) {
-        localStorage.clear();
-        navigate('/login');
-      }
+      console.error(err);
     }
   };
 
   const handleLogout = () => {
     localStorage.clear();
-    navigate('/');
+    navigate('/login');
   };
 
-  const addMedication = async (elderCode, data) => {
-    await api.post(`/medications/${elderCode}`, data);
-    fetchElders();
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
   };
 
-  const updateMedicationStatus = async (id, status) => {
-    await api.put(`/medications/${id}`, { status });
-    fetchElders();
+  const saveElder = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    try {
+      const res = await api.post('/family/elder', Object.fromEntries(formData));
+      setElder(res.data);
+      setShowElderPanel(false);
+      loadData();
+    } catch (err) {
+      alert('Failed to save elder profile');
+    }
   };
 
-  const addActivity = async (elderCode, data) => {
-    await api.post(`/activities/${elderCode}`, data);
-    fetchElders();
+  const addMedication = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    try {
+      await api.post('/family/medications', Object.fromEntries(formData));
+      setShowMedicationPanel(false);
+      loadData();
+    } catch (err) {
+      alert('Failed to add medication');
+    }
   };
 
-  const addAppointment = async (elderCode, data) => {
-    await api.post(`/appointments/${elderCode}`, data);
-    fetchElders();
+  const deleteMedication = async (id) => {
+    if (!window.confirm('Delete this medication?')) return;
+    try {
+      await api.delete(`/family/medications/${id}`);
+      loadData();
+    } catch (err) {
+      alert('Failed to delete');
+    }
   };
+
+  const addActivity = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    try {
+      await api.post('/family/activities', Object.fromEntries(formData));
+      setShowActivityPanel(false);
+      loadData();
+    } catch (err) {
+      alert('Failed to add activity');
+    }
+  };
+
+  const deleteActivity = async (id) => {
+    if (!window.confirm('Delete this activity?')) return;
+    try {
+      await api.delete(`/family/activities/${id}`);
+      loadData();
+    } catch (err) {
+      alert('Failed to delete');
+    }
+  };
+
+  const saveBaselineVitals = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    try {
+      const res = await api.post('/family/baseline-vitals', Object.fromEntries(formData));
+      setBaselineVitals(res.data);
+      setShowVitalsPanel(false);
+      loadData();
+    } catch (err) {
+      alert('Failed to save vitals');
+    }
+  };
+
+  const submitRequest = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+    data.appointments = appointments;
+    try {
+      await api.post('/family/requests', data);
+      setShowRequestPanel(false);
+      setAppointments([]);
+      loadData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to submit request');
+    }
+  };
+
+  const renderOverview = () => (
+    <>
+      <section className="dashboard-section">
+        <h3 className="section-label">YOUR ELDERS</h3>
+        {!elder ? (
+          <EmptyState message="No elders assigned to you yet. Please contact your administrator." />
+        ) : (
+          <div className="elder-cards-grid">
+            <div className="elder-card">
+              <div className="elder-card-header">
+                <div className="elder-avatar">{elder.full_name?.charAt(0)}</div>
+                <div className="elder-info">
+                  <h4 className="elder-name">{elder.full_name}</h4>
+                  <p className="elder-meta">{elder.age} years · Room {elder.room || 'N/A'}</p>
+                </div>
+              </div>
+              <div className="elder-status">
+                <StatusBadge status="completed">All clear today</StatusBadge>
+              </div>
+              <div className="elder-stats">
+                <div className="elder-stat">
+                  <div className="elder-stat-value">{activities.length}</div>
+                  <div className="elder-stat-label">Events</div>
+                </div>
+                <div className="elder-stat">
+                  <div className="elder-stat-value">{medications.filter(m => m.status === 'completed').length}</div>
+                  <div className="elder-stat-label">Meds taken</div>
+                </div>
+                <div className="elder-stat">
+                  <div className="elder-stat-value">0</div>
+                  <div className="elder-stat-label">Alerts</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {elder && (
+        <>
+          <section className="dashboard-section">
+            <h3 className="section-label">TODAY'S TIMELINE</h3>
+            <div className="timeline-card">
+              {medications.length === 0 && activities.length === 0 ? (
+                <EmptyState message="No events scheduled for today" />
+              ) : (
+                <>
+                  {medications.map((med, idx) => (
+                    <div key={`med-${idx}`} className="timeline-row">
+                      <div className="timeline-time">09:00</div>
+                      <div className="timeline-icon timeline-icon-medication">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <rect x="4" y="4" width="8" height="8" rx="1" fill="var(--teal-600)"/>
+                        </svg>
+                      </div>
+                      <div className="timeline-content">
+                        <div className="timeline-title">{med.medicine_name}</div>
+                        <div className="timeline-subtitle">{med.dosage} · {med.frequency}</div>
+                      </div>
+                      <StatusBadge status={med.status || 'pending'}>{med.status || 'Pending'}</StatusBadge>
+                    </div>
+                  ))}
+                  {activities.map((act, idx) => (
+                    <div key={`act-${idx}`} className="timeline-row">
+                      <div className="timeline-time">{act.preferred_time || '14:00'}</div>
+                      <div className="timeline-icon timeline-icon-activity">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <circle cx="8" cy="8" r="4" fill="var(--gray-500)"/>
+                        </svg>
+                      </div>
+                      <div className="timeline-content">
+                        <div className="timeline-title">{act.activity_name}</div>
+                        <div className="timeline-subtitle">{act.duration_minutes} minutes</div>
+                      </div>
+                      <StatusBadge status="pending">Scheduled</StatusBadge>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </section>
+
+          <section className="dashboard-section">
+            <h3 className="section-label">ALERTS</h3>
+            <EmptyState message="No alerts right now" />
+          </section>
+        </>
+      )}
+    </>
+  );
+
+  const renderCarePlan = () => (
+    <>
+      <section className="dashboard-section">
+        <div className="section-card">
+          <div className="section-card-header">
+            <h3 className="section-card-title">Elder profile</h3>
+            <button className="btn-ghost" onClick={() => setShowElderPanel(true)}>
+              {elder ? 'Edit' : 'Set up profile'}
+            </button>
+          </div>
+          {!elder ? (
+            <EmptyState message="No elder profile set up yet" />
+          ) : (
+            <div className="info-grid">
+              <div className="info-item"><span className="info-label">Full name:</span> {elder.full_name}</div>
+              <div className="info-item"><span className="info-label">Age:</span> {elder.age}</div>
+              <div className="info-item"><span className="info-label">Gender:</span> {elder.gender}</div>
+              <div className="info-item"><span className="info-label">Medical history:</span> {elder.medical_history || 'None'}</div>
+              <div className="info-item"><span className="info-label">Allergies:</span> {elder.allergies || 'None'}</div>
+              <div className="info-item"><span className="info-label">Emergency contact:</span> {elder.emergency_contact}</div>
+              <div className="info-item"><span className="info-label">Emergency phone:</span> {elder.emergency_phone}</div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <div className="section-card">
+          <div className="section-card-header">
+            <h3 className="section-card-title">Medications</h3>
+            <button className="btn-primary" onClick={() => setShowMedicationPanel(true)}>+ Add medication</button>
+          </div>
+          {medications.length === 0 ? (
+            <EmptyState message="No medications added yet" />
+          ) : (
+            <div className="list-items">
+              {medications.map(m => (
+                <div key={m.id} className="list-item">
+                  <div className="list-item-content">
+                    <div className="list-item-title">{m.medicine_name}</div>
+                    <div className="list-item-subtitle">{m.dosage} · {m.frequency}</div>
+                    {m.instructions && <div className="list-item-pill">{m.instructions}</div>}
+                  </div>
+                  <button className="btn-icon-delete" onClick={() => deleteMedication(m.id)}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <div className="section-card">
+          <div className="section-card-header">
+            <h3 className="section-card-title">Preferred activities</h3>
+            <button className="btn-primary" onClick={() => setShowActivityPanel(true)}>+ Add activity</button>
+          </div>
+          {activities.length === 0 ? (
+            <EmptyState message="No activities added yet" />
+          ) : (
+            <div className="list-items">
+              {activities.map(a => (
+                <div key={a.id} className="list-item">
+                  <div className="list-item-content">
+                    <div className="list-item-title">{a.activity_name}</div>
+                    <div className="list-item-subtitle">{a.preferred_time} · {a.duration_minutes} minutes</div>
+                    {a.notes && <div className="list-item-pill">{a.notes}</div>}
+                  </div>
+                  <button className="btn-icon-delete" onClick={() => deleteActivity(a.id)}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <div className="section-card">
+          <div className="section-card-header">
+            <h3 className="section-card-title">Baseline vitals</h3>
+            <button className="btn-ghost" onClick={() => setShowVitalsPanel(true)}>Update vitals</button>
+          </div>
+          {!baselineVitals ? (
+            <EmptyState message="Baseline vitals not recorded yet" />
+          ) : (
+            <VitalsGrid vitals={baselineVitals} />
+          )}
+        </div>
+      </section>
+    </>
+  );
+
+  const renderServiceRequest = () => (
+    <>
+      <section className="dashboard-section">
+        <div className="section-card">
+          <div className="section-card-header">
+            <h3 className="section-card-title">My service requests</h3>
+            <button className="btn-primary" onClick={() => setShowRequestPanel(true)}>+ New request</button>
+          </div>
+          {requests.length === 0 ? (
+            <EmptyState message="No service requests yet" />
+          ) : (
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>REQUEST CODE</th>
+                    <th>START DATE</th>
+                    <th>END DATE</th>
+                    <th>STATUS</th>
+                    <th>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map(r => (
+                    <tr key={r.id}>
+                      <td>{r.request_code}</td>
+                      <td>{r.start_date}</td>
+                      <td>{r.end_date}</td>
+                      <td><StatusBadge status={r.status}>{r.status}</StatusBadge></td>
+                      <td><a href="#" className="table-link">View</a></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+    </>
+  );
+
+  const renderCareLogs = () => (
+    <>
+      <section className="dashboard-section">
+        <div className="section-card">
+          <h3 className="section-card-title">Care logs from caretaker</h3>
+          {careLogs.length === 0 ? (
+            <EmptyState message="No care logs available yet" />
+          ) : (
+            <div className="care-logs">
+              {careLogs.map((log, idx) => (
+                <div key={idx} className="care-log-card">
+                  <div className="care-log-header">
+                    <div className="care-log-date">{new Date(log.log_date).toLocaleDateString()}</div>
+                    <div className="care-log-caretaker">{log.caretaker_name}</div>
+                  </div>
+                  <div className="care-log-grid">
+                    <div className="care-log-field">
+                      <div className="care-log-label">Medications given</div>
+                      <div className="care-log-value">{log.medications_given}</div>
+                    </div>
+                    <div className="care-log-field">
+                      <div className="care-log-label">Activities done</div>
+                      <div className="care-log-value">{log.activities_done}</div>
+                    </div>
+                    <div className="care-log-field">
+                      <div className="care-log-label">Meals served</div>
+                      <div className="care-log-value">{log.meals_served}</div>
+                    </div>
+                    <div className="care-log-field">
+                      <div className="care-log-label">Observations</div>
+                      <div className="care-log-value">{log.observations}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    </>
+  );
 
   return (
-    <div className="family-dashboard page-fade-in">
-      <nav className="family-navbar">
-        <div className="nav-content">
-          <Link to="/" className="nav-home">← Elder Care Home</Link>
-          <div className="nav-tabs">
-            <span className="nav-tab active">Dashboard</span>
-          </div>
-          <button onClick={handleLogout} className="btn-logout">Logout</button>
+    <div className="family-dashboard">
+      <nav className="navbar">
+        <div className="navbar-left">
+          <h1 className="navbar-logo">ElderCare</h1>
+          <StatusBadge status="info">Family</StatusBadge>
+        </div>
+        <div className="navbar-right">
+          <span className="navbar-user">{user?.full_name}</span>
+          <div className="navbar-avatar">{user?.full_name?.charAt(0)}</div>
+          <button className="btn-ghost" onClick={handleLogout}>Logout</button>
         </div>
       </nav>
 
-      <div className="family-content">
-        <div className="welcome-banner">
-          <h1>Hello, {user?.full_name || user?.user_code} 👋</h1>
-          <p>Your loved ones are being cared for</p>
+      <div className="dashboard-content">
+        <div className="greeting-header">
+          <h2 className="greeting-title">{getGreeting()}, {user?.full_name?.split(' ')[0]}</h2>
+          <p className="greeting-subtitle">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {elder && ` · 1 elder assigned to you`}
+          </p>
         </div>
 
-        {(elders || []).length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-            <p>📋 No elders assigned yet</p>
+        <div className="tabs">
+          <button className={`tab ${activeTab === 'overview' ? 'tab-active' : ''}`} onClick={() => setActiveTab('overview')}>Overview</button>
+          <button className={`tab ${activeTab === 'care-plan' ? 'tab-active' : ''}`} onClick={() => setActiveTab('care-plan')}>Care Plan</button>
+          <button className={`tab ${activeTab === 'service-request' ? 'tab-active' : ''}`} onClick={() => setActiveTab('service-request')}>Service Request</button>
+          <button className={`tab ${activeTab === 'care-logs' ? 'tab-active' : ''}`} onClick={() => setActiveTab('care-logs')}>Care Logs</button>
+        </div>
+
+        {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'care-plan' && renderCarePlan()}
+        {activeTab === 'service-request' && renderServiceRequest()}
+        {activeTab === 'care-logs' && renderCareLogs()}
+      </div>
+
+      <SlidePanel isOpen={showElderPanel} onClose={() => setShowElderPanel(false)} title="Edit elder profile">
+        <form onSubmit={saveElder} className="slide-panel-form">
+          <div className="form-field">
+            <label className="form-label">Full Name</label>
+            <input name="full_name" className="form-input" defaultValue={elder?.full_name} required />
           </div>
-        ) : (
-          (elders || []).map(elder => (
-            <ElderSection
-              key={elder.elder_code}
-              elder={elder}
-              onAddMedication={addMedication}
-              onUpdateMedStatus={updateMedicationStatus}
-              onAddActivity={addActivity}
-              onAddAppointment={addAppointment}
+          <div className="form-field">
+            <label className="form-label">Age</label>
+            <input name="age" type="number" className="form-input" defaultValue={elder?.age} required />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Gender</label>
+            <select name="gender" className="form-input" defaultValue={elder?.gender} required>
+              <option value="">Select gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Medical History</label>
+            <textarea name="medical_history" className="form-input" rows="3" defaultValue={elder?.medical_history}></textarea>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Allergies</label>
+            <textarea name="allergies" className="form-input" rows="2" defaultValue={elder?.allergies}></textarea>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Emergency Contact Name</label>
+            <input name="emergency_contact" className="form-input" defaultValue={elder?.emergency_contact} />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Emergency Phone</label>
+            <input name="emergency_phone" className="form-input" defaultValue={elder?.emergency_phone} />
+          </div>
+          <div className="slide-panel-actions">
+            <button type="submit" className="btn-primary-full">Save</button>
+            <button type="button" className="btn-ghost" onClick={() => setShowElderPanel(false)}>Cancel</button>
+          </div>
+        </form>
+      </SlidePanel>
+
+      <SlidePanel isOpen={showMedicationPanel} onClose={() => setShowMedicationPanel(false)} title="Add medication">
+        <form onSubmit={addMedication} className="slide-panel-form">
+          <div className="form-field">
+            <label className="form-label">Medicine Name</label>
+            <input name="medicine_name" className="form-input" required />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Dosage</label>
+            <input name="dosage" className="form-input" required />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Frequency</label>
+            <select name="frequency" className="form-input" required>
+              <option value="">Select frequency</option>
+              <option value="Once daily">Once daily</option>
+              <option value="Twice daily">Twice daily</option>
+              <option value="Three times daily">Three times daily</option>
+              <option value="As needed">As needed</option>
+            </select>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Instructions</label>
+            <textarea name="instructions" className="form-input" rows="2"></textarea>
+          </div>
+          <div className="slide-panel-actions">
+            <button type="submit" className="btn-primary-full">Save</button>
+            <button type="button" className="btn-ghost" onClick={() => setShowMedicationPanel(false)}>Cancel</button>
+          </div>
+        </form>
+      </SlidePanel>
+
+      <SlidePanel isOpen={showActivityPanel} onClose={() => setShowActivityPanel(false)} title="Add activity">
+        <form onSubmit={addActivity} className="slide-panel-form">
+          <div className="form-field">
+            <label className="form-label">Activity Name</label>
+            <input name="activity_name" className="form-input" required />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Preferred Time</label>
+            <input name="preferred_time" type="time" className="form-input" />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Duration (minutes)</label>
+            <input name="duration_minutes" type="number" className="form-input" />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Notes</label>
+            <textarea name="notes" className="form-input" rows="2"></textarea>
+          </div>
+          <div className="slide-panel-actions">
+            <button type="submit" className="btn-primary-full">Save</button>
+            <button type="button" className="btn-ghost" onClick={() => setShowActivityPanel(false)}>Cancel</button>
+          </div>
+        </form>
+      </SlidePanel>
+
+      <SlidePanel isOpen={showVitalsPanel} onClose={() => setShowVitalsPanel(false)} title="Update baseline vitals">
+        <form onSubmit={saveBaselineVitals} className="slide-panel-form">
+          <div className="form-row">
+            <div className="form-field">
+              <label className="form-label">BP Systolic</label>
+              <input name="blood_pressure_systolic" type="number" className="form-input" defaultValue={baselineVitals?.blood_pressure_systolic} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">BP Diastolic</label>
+              <input name="blood_pressure_diastolic" type="number" className="form-input" defaultValue={baselineVitals?.blood_pressure_diastolic} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-field">
+              <label className="form-label">Blood Glucose</label>
+              <input name="blood_glucose" type="number" step="0.01" className="form-input" defaultValue={baselineVitals?.blood_glucose} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">SpO2 (%)</label>
+              <input name="spo2" type="number" className="form-input" defaultValue={baselineVitals?.spo2} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-field">
+              <label className="form-label">Body Temperature (°C)</label>
+              <input name="body_temperature" type="number" step="0.1" className="form-input" defaultValue={baselineVitals?.body_temperature} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Heart Rate</label>
+              <input name="heart_rate" type="number" className="form-input" defaultValue={baselineVitals?.heart_rate} />
+            </div>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Weight (kg)</label>
+            <input name="weight" type="number" step="0.01" className="form-input" defaultValue={baselineVitals?.weight} />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Notes</label>
+            <textarea name="notes" className="form-input" rows="2" defaultValue={baselineVitals?.notes}></textarea>
+          </div>
+          <div className="slide-panel-actions">
+            <button type="submit" className="btn-primary-full">Save</button>
+            <button type="button" className="btn-ghost" onClick={() => setShowVitalsPanel(false)}>Cancel</button>
+          </div>
+        </form>
+      </SlidePanel>
+
+      <SlidePanel isOpen={showRequestPanel} onClose={() => setShowRequestPanel(false)} title="New service request">
+        <form onSubmit={submitRequest} className="slide-panel-form">
+          <div className="form-row">
+            <div className="form-field">
+              <label className="form-label">Start Date</label>
+              <input name="start_date" type="date" className="form-input" required />
+            </div>
+            <div className="form-field">
+              <label className="form-label">End Date</label>
+              <input name="end_date" type="date" className="form-input" required />
+            </div>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Special Requirements</label>
+            <textarea name="special_requirements" className="form-input" rows="2"></textarea>
+          </div>
+          <div className="form-section-header">MEAL PLAN DETAILS</div>
+          <div className="form-field">
+            <label className="form-label">Meal Plan</label>
+            <textarea name="meal_plan" className="form-input" rows="2"></textarea>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Dietary Restrictions</label>
+            <textarea name="dietary_restrictions" className="form-input" rows="2"></textarea>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Meal Timings</label>
+            <input name="meal_timings" className="form-input" />
+          </div>
+          <div className="form-section-header">LOGISTICS</div>
+          <div className="form-field">
+            <label className="form-label">Medication Location</label>
+            <input name="medication_location" className="form-input" />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Equipment Location</label>
+            <input name="equipment_location" className="form-input" />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Emergency Instructions</label>
+            <textarea name="emergency_instructions" className="form-input" rows="2"></textarea>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Additional Notes</label>
+            <textarea name="additional_notes" className="form-input" rows="2"></textarea>
+          </div>
+          <div className="form-section-header">
+            APPOINTMENTS
+            <button type="button" className="btn-ghost-sm" onClick={() => setAppointments([...appointments, {}])}>+ Add appointment</button>
+          </div>
+          {appointments.map((apt, idx) => (
+            <AppointmentEntry
+              key={idx}
+              appointment={apt}
+              onChange={(updated) => {
+                const newApts = [...appointments];
+                newApts[idx] = updated;
+                setAppointments(newApts);
+              }}
+              onRemove={() => setAppointments(appointments.filter((_, i) => i !== idx))}
             />
-          ))
-        )}
-      </div>
+          ))}
+          <div className="slide-panel-actions">
+            <button type="submit" className="btn-primary-full">Submit request</button>
+            <button type="button" className="btn-ghost" onClick={() => setShowRequestPanel(false)}>Cancel</button>
+          </div>
+        </form>
+      </SlidePanel>
     </div>
-  );
-}
-
-function ElderSection({ elder, onAddMedication, onUpdateMedStatus, onAddActivity, onAddAppointment }) {
-  const [showMedForm, setShowMedForm] = useState(false);
-  const [showActForm, setShowActForm] = useState(false);
-  const [showApptForm, setShowApptForm] = useState(false);
-  const [medications, setMedications] = useState([]);
-  const [activities, setActivities] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-
-  useEffect(() => {
-    fetchData();
-  }, [elder.elder_code]);
-
-  const fetchData = async () => {
-    try {
-      const [medRes, actRes, apptRes] = await Promise.all([
-        api.get(`/medications/elder/${elder.elder_code}`),
-        api.get(`/activities/elder/${elder.elder_code}`),
-        api.get(`/appointments/elder/${elder.elder_code}`)
-      ]);
-      setMedications(medRes.data);
-      setActivities(actRes.data);
-      setAppointments(apptRes.data);
-    } catch (err) {}
-  };
-
-  const getInitials = (name) => {
-    return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'EL';
-  };
-
-  return (
-    <div className="elder-section">
-      <div className="elder-profile-card card">
-        <div className="elder-avatar">{getInitials(elder.name)}</div>
-        <div className="elder-info">
-          <h2>{elder.name}</h2>
-          <p>{elder.age} years • {elder.gender}</p>
-        </div>
-      </div>
-
-      <div className="section-grid">
-        <div className="section-card card">
-          <div className="section-header">
-            <h3>💊 Medications</h3>
-            <button className="btn-accent btn-sm" onClick={() => setShowMedForm(!showMedForm)}>+ Add</button>
-          </div>
-          {showMedForm && <MedicationForm elderCode={elder.elder_code} onSubmit={(d) => { onAddMedication(elder.elder_code, d); setShowMedForm(false); fetchData(); }} />}
-          <div className="pill-cards">
-            {(medications || []).map(med => (
-              <div key={med.id} className="pill-card">
-                <div className="pill-info">
-                  <strong>{med.medicine_name}</strong>
-                  <span>{med.dosage} • {med.frequency}</span>
-                </div>
-                <div className="pill-actions">
-                  <button className="btn-taken" onClick={() => { onUpdateMedStatus(med.id, 'taken'); fetchData(); }}>✅ Taken</button>
-                  <button className="btn-missed" onClick={() => { onUpdateMedStatus(med.id, 'missed'); fetchData(); }}>❌ Missed</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="section-card card">
-          <div className="section-header">
-            <h3>🏃 Activities</h3>
-            <button className="btn-accent btn-sm" onClick={() => setShowActForm(!showActForm)}>+ Add</button>
-          </div>
-          {showActForm && <ActivityForm elderCode={elder.elder_code} onSubmit={(d) => { onAddActivity(elder.elder_code, d); setShowActForm(false); fetchData(); }} />}
-          <div className="activity-timeline">
-            {(activities || []).map(act => (
-              <div key={act.id} className="timeline-item">
-                <div className="timeline-dot"></div>
-                <div className="timeline-content">
-                  <strong>{act.activity_type}</strong>
-                  <span>{new Date(act.scheduled_time).toLocaleString()}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="section-card card">
-          <div className="section-header">
-            <h3>📅 Appointments</h3>
-            <button className="btn-accent btn-sm" onClick={() => setShowApptForm(!showApptForm)}>+ Add</button>
-          </div>
-          {showApptForm && <AppointmentForm elderCode={elder.elder_code} onSubmit={(d) => { onAddAppointment(elder.elder_code, d); setShowApptForm(false); fetchData(); }} />}
-          <div className="appointment-list">
-            {(appointments || []).map(appt => (
-              <div key={appt.id} className="appointment-card">
-                <div className="appt-date">{new Date(appt.appointment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-                <div className="appt-details">
-                  <strong>{appt.doctor_name}</strong>
-                  <span>{appt.hospital_name}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MedicationForm({ elderCode, onSubmit }) {
-  const [data, setData] = useState({ medicine_name: '', dosage: '', frequency: '' });
-  return (
-    <form className="inline-form" onSubmit={(e) => { e.preventDefault(); onSubmit(data); }}>
-      <input placeholder="Medicine" value={data.medicine_name} onChange={(e) => setData({ ...data, medicine_name: e.target.value })} required />
-      <input placeholder="Dosage" value={data.dosage} onChange={(e) => setData({ ...data, dosage: e.target.value })} required />
-      <input placeholder="Frequency" value={data.frequency} onChange={(e) => setData({ ...data, frequency: e.target.value })} required />
-      <button type="submit" className="btn-accent btn-sm">Save</button>
-    </form>
-  );
-}
-
-function ActivityForm({ elderCode, onSubmit }) {
-  const [data, setData] = useState({ activity_type: '', scheduled_time: '' });
-  return (
-    <form className="inline-form" onSubmit={(e) => { e.preventDefault(); onSubmit(data); }}>
-      <input placeholder="Activity Type" value={data.activity_type} onChange={(e) => setData({ ...data, activity_type: e.target.value })} required />
-      <input type="datetime-local" value={data.scheduled_time} onChange={(e) => setData({ ...data, scheduled_time: e.target.value })} required />
-      <button type="submit" className="btn-accent btn-sm">Save</button>
-    </form>
-  );
-}
-
-function AppointmentForm({ elderCode, onSubmit }) {
-  const [data, setData] = useState({ doctor_name: '', hospital_name: '', appointment_date: '' });
-  return (
-    <form className="inline-form" onSubmit={(e) => { e.preventDefault(); onSubmit(data); }}>
-      <input placeholder="Doctor Name" value={data.doctor_name} onChange={(e) => setData({ ...data, doctor_name: e.target.value })} required />
-      <input placeholder="Hospital" value={data.hospital_name} onChange={(e) => setData({ ...data, hospital_name: e.target.value })} required />
-      <input type="datetime-local" value={data.appointment_date} onChange={(e) => setData({ ...data, appointment_date: e.target.value })} required />
-      <button type="submit" className="btn-accent btn-sm">Save</button>
-    </form>
   );
 }
 

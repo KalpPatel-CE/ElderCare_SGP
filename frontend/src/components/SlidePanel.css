@@ -1,0 +1,91 @@
+.slide-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+}
+
+.slide-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  height: 100vh;
+  background: var(--white);
+  border-left: 0.5px solid var(--gray-200);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.slide-panel-header {
+  padding: 32px 28px 24px;
+  border-bottom: 0.5px solid var(--gray-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.slide-panel-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--gray-900);
+}
+
+.slide-panel-close {
+  font-size: 24px;
+  color: var(--gray-400);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.slide-panel-close:hover {
+  color: var(--gray-700);
+}
+
+.slide-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px;
+}
+
+.slide-panel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.slide-panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+@media (max-width: 768px) {
+  .slide-panel {
+    width: 100%;
+  }
+}
