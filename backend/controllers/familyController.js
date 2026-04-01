@@ -155,22 +155,51 @@ exports.createRequest = async (req, res) => {
       appointments
     } = req.body;
 
+    console.log('Creating request with data:', req.body);
+
     const elder = await pool.query('SELECT id, elder_code FROM elders WHERE family_id=$1', [req.user.id]);
     if (!elder.rows[0]) return res.status(400).json({ error: 'Please create elder profile first' });
 
     const countRes = await pool.query('SELECT COUNT(*) FROM caretaker_requests');
     const request_code = `REQ-${parseInt(countRes.rows[0].count) + 1}`;
 
-    const requestResult = await pool.query(`
-      INSERT INTO caretaker_requests
-        (request_code, family_id, elder_id, start_date, end_date,
-         special_requirements, service_address, service_city)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
-    `, [request_code, req.user.id, elder.rows[0].id,
-        start_date, end_date, special_requirements,
-        service_address, service_city]);
+    // Calculate service amount
+    const start = new Date(start_date);
+    const end = new Date(end_date);
+    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    const ratePerDay = 800; // ₹800 per day base rate
+    const total_amount = days * ratePerDay;
+
+    console.log('Calculated amount:', { days, ratePerDay, total_amount });
+
+    // Check if total_amount column exists, if not insert without it
+    let requestResult;
+    try {
+      requestResult = await pool.query(`
+        INSERT INTO caretaker_requests
+          (request_code, family_id, elder_id, start_date, end_date,
+           special_requirements, service_address, service_city, total_amount)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *
+      `, [request_code, req.user.id, elder.rows[0].id,
+          start_date, end_date, special_requirements,
+          service_address, service_city, total_amount]);
+    } catch (colErr) {
+      console.log('Column error, trying without total_amount:', colErr.message);
+      // If total_amount column doesn't exist, insert without it
+      requestResult = await pool.query(`
+        INSERT INTO caretaker_requests
+          (request_code, family_id, elder_id, start_date, end_date,
+           special_requirements, service_address, service_city)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
+      `, [request_code, req.user.id, elder.rows[0].id,
+          start_date, end_date, special_requirements,
+          service_address, service_city]);
+      // Add total_amount to the returned object
+      requestResult.rows[0].total_amount = total_amount;
+    }
 
     const request = requestResult.rows[0];
+    console.log('Request created:', request);
 
     await pool.query(`
       INSERT INTO service_details (request_id, meal_plan, dietary_restrictions, meal_timings, medication_location, equipment_location, emergency_instructions, additional_notes)
@@ -188,8 +217,8 @@ exports.createRequest = async (req, res) => {
 
     res.status(201).json(request);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to create request' });
+    console.error('Create request error:', err);
+    res.status(500).json({ error: err.message || 'Failed to create request' });
   }
 };
 
@@ -207,4 +236,83 @@ exports.getCareLogs = async (req, res) => {
     `, [req.user.id]);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: 'Failed' }); }
+};
+
+exports.payAdvance = async (req, res) => {
+  try {
+    console.log('Processing advance payment for request:', req.params.id);
+    const txnId = 'TXN-ADV-' + Date.now();
+    
+    // Try with payment columns first
+    let result;
+    try {
+      result = await pool.query(`
+        UPDATE caretaker_requests
+        SET advance_paid = true,
+            advance_paid_at = NOW(),
+            advance_transaction_id = $1,
+            status = 'pending',
+            payment_status = 'advance_paid'
+        WHERE id = $2 AND family_id = $3
+        RETURNING *
+      `, [txnId, req.params.id, req.user.id]);
+    } catch (colErr) {
+      console.log('Payment columns not found, updating status only:', colErr.message);
+      // If payment columns don't exist, just update status
+      result = await pool.query(`
+        UPDATE caretaker_requests
+        SET status = 'pending'
+        WHERE id = $1 AND family_id = $2
+        RETURNING *
+      `, [req.params.id, req.user.id]);
+    }
+
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: 'Request not found' });
+
+    console.log('Advance payment successful:', txnId);
+    res.json({ message: 'Advance payment successful', transaction_id: txnId, request: result.rows[0] });
+  } catch (err) {
+    console.error('Payment error:', err);
+    res.status(500).json({ error: err.message || 'Payment failed' });
+  }
+};
+
+exports.payFinal = async (req, res) => {
+  try {
+    const txnId = 'TXN-FIN-' + Date.now();
+    const result = await pool.query(`
+      UPDATE caretaker_requests
+      SET final_paid = true,
+          final_paid_at = NOW(),
+          final_transaction_id = $1,
+          status = 'completed',
+          payment_status = 'paid'
+      WHERE id = $2 AND family_id = $3
+      RETURNING *
+    `, [txnId, req.params.id, req.user.id]);
+
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: 'Request not found' });
+
+    // Free up caretaker availability
+    await pool.query(`
+      UPDATE caretakers SET availability_status = 'available'
+      WHERE id = (
+        SELECT caretaker_id FROM service_assignments
+        WHERE request_id = $1
+      )
+    `, [req.params.id]);
+
+    // Update assignment status
+    await pool.query(`
+      UPDATE service_assignments SET status = 'completed'
+      WHERE request_id = $1
+    `, [req.params.id]);
+
+    res.json({ message: 'Final payment successful', transaction_id: txnId, request: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Payment failed' });
+  }
 };

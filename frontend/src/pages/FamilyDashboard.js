@@ -139,14 +139,42 @@ function FamilyDashboard() {
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
     data.appointments = appointments;
-    try {
-      await api.post('/family/requests', data);
-      setShowRequestPanel(false);
-      setAppointments([]);
-      loadData();
-    } catch (err) {
-      alert(err.response?.data?.error || 'Failed to submit request');
+
+    // Validate dates
+    const startDate = new Date(data.start_date);
+    const endDate = new Date(data.end_date);
+    
+    if (endDate <= startDate) {
+      alert('End date must be after start date');
+      return;
     }
+
+    const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    
+    if (days < 1) {
+      alert('Service must be at least 1 day');
+      return;
+    }
+
+    const totalAmount = days * 800;
+    const advanceAmount = totalAmount / 2;
+
+    const startFormatted = new Date(data.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const endFormatted = new Date(data.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    setShowRequestPanel(false);
+    setAppointments([]);
+
+    // Navigate to payment gateway with request data (not created yet)
+    navigate('/payment', {
+      state: {
+        requestData: data,
+        amount: advanceAmount,
+        paymentType: 'advance',
+        serviceDates: `${startFormatted} – ${endFormatted}`,
+        isNewRequest: true
+      }
+    });
   };
 
   const renderOverview = () => (
@@ -343,29 +371,59 @@ function FamilyDashboard() {
           {requests.length === 0 ? (
             <EmptyState message="No service requests yet" />
           ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>REQUEST CODE</th>
-                    <th>START DATE</th>
-                    <th>END DATE</th>
-                    <th>STATUS</th>
-                    <th>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map(r => (
-                    <tr key={r.id}>
-                      <td>{r.request_code}</td>
-                      <td>{r.start_date}</td>
-                      <td>{r.end_date}</td>
-                      <td><StatusBadge status={r.status}>{r.status}</StatusBadge></td>
-                      <td><a href="#" className="table-link">View</a></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="requests-list">
+              {requests.map(r => {
+                const startFormatted = new Date(r.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                const endFormatted = new Date(r.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                return (
+                  <div key={r.id} className="request-card">
+                    <div className="request-card-header">
+                      <div>
+                        <div className="request-code">{r.request_code}</div>
+                        <div className="request-dates">{startFormatted} – {endFormatted}</div>
+                      </div>
+                      <StatusBadge status={r.status}>{r.status}</StatusBadge>
+                    </div>
+                    {r.caretaker_name && (
+                      <div className="request-caretaker">
+                        <strong>Caretaker:</strong> {r.caretaker_name} ({r.caretaker_city})
+                      </div>
+                    )}
+                    {r.total_amount > 0 && (
+                      <div className="payment-status-row">
+                        <span className={`pay-badge ${r.advance_paid ? 'paid' : 'pending'}`}>
+                          {r.advance_paid ? '✓ Advance Paid' : '⏳ Advance Pending'}
+                        </span>
+                        <span className={`pay-badge ${r.final_paid ? 'paid' : 'pending'}`}>
+                          {r.final_paid ? '✓ Final Paid' : '⏳ Final Pending'}
+                        </span>
+                        <span className="total-amount-badge">
+                          Total: ₹{Number(r.total_amount).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    )}
+                    {r.advance_paid && !r.final_paid && 
+                     (r.status === 'confirmed' || r.status === 'active') && (
+                      <button
+                        className="pay-final-btn"
+                        onClick={() => {
+                          const finalAmount = r.total_amount / 2;
+                          navigate('/payment', {
+                            state: {
+                              requestId: r.id,
+                              amount: finalAmount,
+                              paymentType: 'final',
+                              requestCode: r.request_code,
+                              serviceDates: `${startFormatted} – ${endFormatted}`
+                            }
+                          });
+                        }}>
+                        💳 Pay Final 50% — ₹{(r.total_amount / 2).toLocaleString('en-IN')}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -601,12 +659,44 @@ function FamilyDashboard() {
           <div className="form-row">
             <div className="form-field">
               <label className="form-label">Start Date</label>
-              <input name="start_date" type="date" className="form-input" required />
+              <input 
+                name="start_date" 
+                type="date" 
+                className="form-input" 
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => {
+                  const endDateInput = e.target.form.elements.end_date;
+                  endDateInput.min = e.target.value;
+                }}
+                required 
+              />
             </div>
             <div className="form-field">
               <label className="form-label">End Date</label>
-              <input name="end_date" type="date" className="form-input" required />
+              <input 
+                name="end_date" 
+                type="date" 
+                className="form-input" 
+                min={new Date().toISOString().split('T')[0]}
+                required 
+              />
             </div>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Service Address</label>
+            <textarea name="service_address" className="form-input" rows="2" placeholder="Where will the caretaker provide service?" required></textarea>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Service City</label>
+            <select name="service_city" className="form-input" required>
+              <option value="">Select city</option>
+              <option value="Ahmedabad">Ahmedabad</option>
+              <option value="Surat">Surat</option>
+              <option value="Vadodara">Vadodara</option>
+              <option value="Rajkot">Rajkot</option>
+              <option value="Bhavnagar">Bhavnagar</option>
+              <option value="Jamnagar">Jamnagar</option>
+            </select>
           </div>
           <div className="form-field">
             <label className="form-label">Special Requirements</label>

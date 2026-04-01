@@ -15,6 +15,8 @@ router.get('/baseline-vitals', auth, fc.getBaselineVitals);
 router.post('/baseline-vitals', auth, fc.saveBaselineVitals);
 router.get('/requests', auth, fc.getRequests);
 router.post('/requests', auth, fc.createRequest);
+router.post('/requests/:id/pay-advance', auth, fc.payAdvance);
+router.post('/requests/:id/pay-final', auth, fc.payFinal);
 router.get('/care-logs', auth, fc.getCareLogs);
 
 module.exports = router;
