@@ -17,6 +17,9 @@ function AdminDashboard() {
   const [showAssignPanel, setShowAssignPanel] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showAddCaretakerPanel, setShowAddCaretakerPanel] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectingRequest, setRejectingRequest] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [requestCity, setRequestCity] = useState('');
   const [cityFiltered, setCityFiltered] = useState(false);
@@ -113,6 +116,28 @@ function AdminDashboard() {
       loadData();
     } catch (err) {
       alert('Failed to update');
+    }
+  };
+
+  const handleRejectRequest = (request) => {
+    setRejectingRequest(request);
+    setShowRejectModal(true);
+    setRejectReason('');
+  };
+
+  const confirmRejectRequest = async () => {
+    if (!rejectingRequest) return;
+    try {
+      await api.post(`/admin/requests/${rejectingRequest.id}/reject`, {
+        reason: rejectReason || 'No reason provided'
+      });
+      alert('Request rejected successfully');
+      setShowRejectModal(false);
+      setRejectingRequest(null);
+      setRejectReason('');
+      loadData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to reject request');
     }
   };
 
@@ -233,6 +258,7 @@ function AdminDashboard() {
                         <td>{r.start_date}</td>
                         <td>
                           <button className="btn-primary-sm" onClick={() => openAssignPanel(r)}>Assign</button>
+                          <button className="btn-danger-sm" onClick={() => handleRejectRequest(r)} style={{ marginLeft: '8px' }}>Reject</button>
                         </td>
                       </tr>
                     ))}
@@ -271,6 +297,7 @@ function AdminDashboard() {
                         <td>{r.end_date}</td>
                         <td>
                           <button className="btn-primary-sm" onClick={() => openAssignPanel(r)}>Assign</button>
+                          <button className="btn-danger-sm" onClick={() => handleRejectRequest(r)} style={{ marginLeft: '8px' }}>Reject</button>
                         </td>
                       </tr>
                     ))}
@@ -602,6 +629,26 @@ function AdminDashboard() {
           </div>
         </form>
       </SlidePanel>
+
+      {showRejectModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '24px', maxWidth: '500px', width: '90%' }}>
+            <h3 style={{ marginBottom: '16px', fontSize: '1.25rem', fontWeight: '600' }}>Reject Request</h3>
+            <p style={{ marginBottom: '16px', color: '#666' }}>Request Code: <strong>{rejectingRequest?.request_code}</strong></p>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Reason for rejection (optional)</label>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Enter reason for rejection..."
+              style={{ width: '100%', minHeight: '100px', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '0.95rem', resize: 'vertical' }}
+            />
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button onClick={confirmRejectRequest} style={{ flex: 1, padding: '12px', background: '#e53e3e', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Confirm Reject</button>
+              <button onClick={() => { setShowRejectModal(false); setRejectingRequest(null); setRejectReason(''); }} style={{ flex: 1, padding: '12px', background: '#eee', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

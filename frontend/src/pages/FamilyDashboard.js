@@ -402,8 +402,7 @@ function FamilyDashboard() {
                         </span>
                       </div>
                     )}
-                    {r.advance_paid && !r.final_paid && 
-                     (r.status === 'confirmed' || r.status === 'active') && (
+                    {r.advance_paid && !r.final_paid && r.status === 'completed' && (
                       <button
                         className="pay-final-btn"
                         onClick={() => {
@@ -420,6 +419,11 @@ function FamilyDashboard() {
                         }}>
                         💳 Pay Final 50% — ₹{(r.total_amount / 2).toLocaleString('en-IN')}
                       </button>
+                    )}
+                    {r.status === 'cancelled' && r.rejection_reason && (
+                      <div style={{ marginTop: '10px', padding: '10px', background: '#fff5f5', borderRadius: '6px', fontSize: '0.9rem', color: '#c53030' }}>
+                        <strong>Rejection Reason:</strong> {r.rejection_reason}
+                      </div>
                     )}
                   </div>
                 );

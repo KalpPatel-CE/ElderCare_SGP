@@ -10,5 +10,6 @@ router.get('/appointments', auth, cc.getElderAppointments);
 router.post('/care-log', auth, cc.submitCareLog);
 router.post('/vitals', auth, cc.recordVitals);
 router.get('/past-assignments', auth, cc.getPastAssignments);
+router.post('/complete-assignment', auth, cc.completeAssignment);
 
 module.exports = router;

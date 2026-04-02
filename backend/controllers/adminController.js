@@ -4,15 +4,19 @@ const bcrypt = require('bcrypt');
 exports.getPendingRequests = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT cr.*, e.full_name as elder_name, e.age, e.gender,
+      SELECT 
+        cr.id, cr.request_code, cr.family_id, cr.elder_id, cr.start_date,
+        cr.end_date, cr.status, cr.special_requirements, cr.service_city,
+        cr.service_address, cr.created_at, cr.total_amount,
+        e.full_name as elder_name, e.age, e.gender, e.elder_code,
         f.full_name as family_name, f.phone as family_phone,
-        f.relation_to_elder, f.city as family_city,
-        cr.service_city, cr.service_address
+        f.relation_to_elder, f.city as family_city
       FROM caretaker_requests cr
       JOIN elders e ON e.id = cr.elder_id
       JOIN families f ON f.id = cr.family_id
       WHERE cr.status='pending'
       ORDER BY cr.created_at ASC
+      LIMIT 100
     `);
     res.json(result.rows);
   } catch (err) {
@@ -24,7 +28,10 @@ exports.getPendingRequests = async (req, res) => {
 exports.getAllRequests = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT cr.*, e.full_name as elder_name,
+      SELECT 
+        cr.id, cr.request_code, cr.status, cr.start_date, cr.end_date,
+        cr.service_city, cr.created_at, cr.total_amount,
+        e.full_name as elder_name, e.elder_code,
         f.full_name as family_name,
         c.full_name as caretaker_name,
         sa.status as assignment_status
@@ -34,6 +41,7 @@ exports.getAllRequests = async (req, res) => {
       LEFT JOIN service_assignments sa ON sa.request_id = cr.id
       LEFT JOIN caretakers c ON c.id = sa.caretaker_id
       ORDER BY cr.created_at DESC
+      LIMIT 100
     `);
     res.json(result.rows);
   } catch (err) {
@@ -149,11 +157,15 @@ exports.getAllCaretakers = async (req, res) => {
 exports.getAllFamilies = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT f.*, e.full_name as elder_name, e.elder_code,
+      SELECT 
+        f.id, f.family_code, f.full_name, f.email, f.phone,
+        f.city, f.state, f.relation_to_elder, f.is_active, f.created_at,
+        e.full_name as elder_name, e.elder_code,
         (SELECT COUNT(*) FROM caretaker_requests WHERE family_id = f.id) as request_count
       FROM families f
       LEFT JOIN elders e ON e.family_id = f.id
       ORDER BY f.created_at DESC
+      LIMIT 100
     `);
     res.json(result.rows);
   } catch (err) {
@@ -206,7 +218,85 @@ exports.getStats = async (req, res) => {
       activeAssignments: parseInt(active.rows[0].count)
     });
   } catch (err) {
-    console.error(err);
+    console.error(`[${new Date().toISOString()}] GET /admin/stats:`, err.message);
     res.status(500).json({ error: 'Failed' });
+  }
+};
+
+exports.rejectRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const result = await pool.query(`
+      UPDATE caretaker_requests
+      SET status = 'cancelled', rejection_reason = $1
+      WHERE id = $2
+      RETURNING *
+    `, [reason || 'Rejected by admin', id]);
+
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+
+    const req_data = result.rows[0];
+    await pool.query(`
+      INSERT INTO alerts (family_id, elder_id, alert_type, message, severity)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [req_data.family_id, req_data.elder_id, 'request_rejected',
+       `Your service request ${req_data.request_code} has been cancelled. Reason: ${reason || 'No reason provided'}`,
+       'medium']);
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] POST /admin/requests/:id/reject:`, err.message);
+    res.status(500).json({ error: 'Failed to reject request' });
+  }
+};
+
+exports.getElderReport = async (req, res) => {
+  try {
+    const { elder_code } = req.params;
+
+    const [meds, activities, appointments, vitals] = await Promise.all([
+      pool.query(`
+        SELECT status, COUNT(*) as count 
+        FROM medications m
+        JOIN elders e ON e.id = m.elder_id
+        WHERE e.elder_code = $1 
+        GROUP BY status
+      `, [elder_code]),
+      pool.query(`
+        SELECT status, COUNT(*) as count 
+        FROM elder_activities ea
+        JOIN elders e ON e.id = ea.elder_id
+        WHERE e.elder_code = $1 
+        GROUP BY status
+      `, [elder_code]),
+      pool.query(`
+        SELECT status, COUNT(*) as count 
+        FROM appointments a
+        JOIN elders e ON e.id = a.elder_id
+        WHERE e.elder_code = $1 
+        GROUP BY status
+      `, [elder_code]),
+      pool.query(`
+        SELECT v.blood_pressure_systolic, v.blood_pressure_diastolic,
+               v.blood_glucose, v.glucose_type, v.spo2,
+               v.body_temperature, v.heart_rate, v.weight, v.notes, v.recorded_at
+        FROM vitals v
+        JOIN elders e ON e.id = v.elder_id
+        WHERE e.elder_code = $1
+        ORDER BY v.recorded_at DESC LIMIT 10
+      `, [elder_code])
+    ]);
+
+    res.json({
+      medications: meds.rows,
+      activities: activities.rows,
+      appointments: appointments.rows,
+      vitals: vitals.rows
+    });
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] GET /admin/report/:elder_code:`, err.message);
+    res.status(500).json({ error: 'Failed to generate report' });
   }
 };

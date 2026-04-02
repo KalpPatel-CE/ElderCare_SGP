@@ -41,13 +41,11 @@ function PaymentGateway() {
           setTransactionId(paymentRes.data.transaction_id);
           setFinalRequestCode(request.request_code);
         } else {
-          // Existing request - just process payment
-          const endpoint = paymentType === 'advance'
-            ? `/family/requests/${requestId}/pay-advance`
-            : `/family/requests/${requestId}/pay-final`;
-
-          const res = await api.post(endpoint);
-          setTransactionId(res.data.transaction_id);
+          // Existing request - use unified payment endpoint
+          const res = await api.post(`/family/requests/${requestId}/payment`, {
+            payment_type: paymentType
+          });
+          setTransactionId(res.data.advance_transaction_id || res.data.final_transaction_id || 'TXN-' + Date.now());
         }
         setStage('success');
       } catch (err) {

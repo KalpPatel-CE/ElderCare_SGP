@@ -92,6 +92,17 @@ function CaretakerDashboard() {
     }
   };
 
+  const handleCompleteService = async () => {
+    if (!window.confirm('Are you sure you want to mark this service as complete? This cannot be undone.')) return;
+    try {
+      await api.post('/caretaker/complete-assignment');
+      alert('Service completed successfully! You are now available for new assignments.');
+      loadData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to complete service');
+    }
+  };
+
   const totalTasks = medications.length + activities.length;
   const completedCount = Object.values(completedTasks).filter(Boolean).length;
   const progressPercent = totalTasks > 0 ? (completedCount / totalTasks) * 100 : 0;
@@ -185,6 +196,11 @@ function CaretakerDashboard() {
             </div>
             <button onClick={() => setShowLogModal(true)} className="eod-btn">
               Submit End of Day Report
+            </button>
+            <button
+              onClick={handleCompleteService}
+              style={{ marginTop: '12px', width: '100%', padding: '14px', background: '#0D6E6E', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer' }}>
+              ✅ Complete Service
             </button>
           </div>
         </>

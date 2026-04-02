@@ -130,7 +130,11 @@ exports.saveBaselineVitals = async (req, res) => {
 exports.getRequests = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT cr.*, sa.caretaker_id,
+      SELECT 
+        cr.id, cr.request_code, cr.family_id, cr.elder_id, cr.start_date, 
+        cr.end_date, cr.status, cr.special_requirements, cr.service_address, 
+        cr.service_city, cr.created_at, cr.total_amount,
+        sa.caretaker_id, sa.status as assignment_status,
         c.full_name as caretaker_name, c.phone as caretaker_phone,
         c.experience_years, c.specialization, c.rating, c.photo_url,
         c.city as caretaker_city, c.background_check_status
@@ -139,9 +143,53 @@ exports.getRequests = async (req, res) => {
       LEFT JOIN caretakers c ON c.id = sa.caretaker_id
       WHERE cr.family_id=$1
       ORDER BY cr.created_at DESC
+      LIMIT 50
     `, [req.user.id]);
     res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: 'Failed' }); }
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] GET /family/requests:`, err.message);
+    res.status(500).json({ error: 'Failed' });
+  }
+};
+
+exports.updatePaymentStatus = async (req, res) => {
+  try {
+    const { payment_type } = req.body;
+    const { id } = req.params;
+
+    if (payment_type === 'advance') {
+      const txnId = 'TXN-ADV-' + Date.now();
+      const result = await pool.query(`
+        UPDATE caretaker_requests
+        SET advance_paid = true,
+            advance_paid_at = NOW(),
+            advance_transaction_id = $1,
+            payment_status = 'advance_paid'
+        WHERE id = $2 AND family_id = $3
+        RETURNING *
+      `, [txnId, id, req.user.id]);
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+      res.json(result.rows[0]);
+    } else if (payment_type === 'final') {
+      const txnId = 'TXN-FIN-' + Date.now();
+      const result = await pool.query(`
+        UPDATE caretaker_requests
+        SET final_paid = true,
+            final_paid_at = NOW(),
+            final_transaction_id = $1,
+            payment_status = 'paid'
+        WHERE id = $2 AND family_id = $3
+        RETURNING *
+      `, [txnId, id, req.user.id]);
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+      res.json(result.rows[0]);
+    } else {
+      res.status(400).json({ error: 'Invalid payment_type' });
+    }
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] POST /family/requests/:id/payment:`, err.message);
+    res.status(500).json({ error: 'Failed to update payment' });
+  }
 };
 
 exports.createRequest = async (req, res) => {
@@ -225,10 +273,13 @@ exports.createRequest = async (req, res) => {
 exports.getCareLogs = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT dcl.*, c.full_name as caretaker_name
+      SELECT 
+        dcl.id, dcl.log_date, dcl.medications_given, dcl.activities_done,
+        dcl.meals_served, dcl.observations, dcl.created_at,
+        c.full_name as caretaker_name
       FROM daily_care_logs dcl
-      JOIN caretakers c ON c.id = dcl.caretaker_id
       JOIN service_assignments sa ON sa.id = dcl.assignment_id
+      JOIN caretakers c ON c.id = dcl.caretaker_id
       JOIN caretaker_requests cr ON cr.id = sa.request_id
       WHERE cr.family_id=$1
       ORDER BY dcl.log_date DESC

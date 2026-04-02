@@ -3,8 +3,10 @@ const pool = require('../db/db');
 exports.getAssignment = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT sa.*, cr.start_date, cr.end_date, cr.special_requirements,
-        e.full_name as elder_name, e.age, e.gender, e.elder_code,
+      SELECT 
+        sa.id, sa.request_id, sa.status, sa.assigned_at,
+        cr.start_date, cr.end_date, cr.special_requirements,
+        e.id as elder_id, e.full_name as elder_name, e.age, e.gender, e.elder_code,
         e.medical_history, e.allergies, e.emergency_contact, e.emergency_phone,
         sd.meal_plan, sd.dietary_restrictions, sd.meal_timings,
         sd.medication_location, sd.equipment_location,
@@ -130,14 +132,55 @@ exports.recordVitals = async (req, res) => {
 exports.getPastAssignments = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT sa.*, cr.start_date, cr.end_date,
-        e.full_name as elder_name, e.age
+      SELECT 
+        sa.id, sa.request_id, sa.status, sa.assigned_at,
+        cr.start_date, cr.end_date, cr.request_code,
+        e.full_name as elder_name, e.age, e.elder_code
       FROM service_assignments sa
       JOIN caretaker_requests cr ON cr.id = sa.request_id
       JOIN elders e ON e.id = cr.elder_id
       WHERE sa.caretaker_id=$1
       ORDER BY sa.assigned_at DESC
+      LIMIT 50
     `, [req.user.id]);
     res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: 'Failed' }); }
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] GET /caretaker/past-assignments:`, err.message);
+    res.status(500).json({ error: 'Failed' });
+  }
+};
+
+exports.completeAssignment = async (req, res) => {
+  try {
+    const assignment = await pool.query(`
+      SELECT sa.id, sa.request_id, cr.family_id, cr.elder_id, cr.request_code
+      FROM service_assignments sa
+      JOIN caretaker_requests cr ON cr.id = sa.request_id
+      WHERE sa.caretaker_id = $1 AND sa.status = 'active'
+      ORDER BY sa.assigned_at DESC LIMIT 1
+    `, [req.user.id]);
+
+    if (!assignment.rows[0]) return res.status(400).json({ error: 'No active assignment found' });
+
+    const a = assignment.rows[0];
+
+    await pool.query('UPDATE service_assignments SET status = $1 WHERE id = $2', ['completed', a.id]);
+    await pool.query('UPDATE caretaker_requests SET status = $1 WHERE id = $2', ['completed', a.request_id]);
+    await pool.query(
+      'UPDATE caretakers SET availability_status = $1, total_assignments = total_assignments + 1 WHERE id = $2',
+      ['available', req.user.id]
+    );
+
+    await pool.query(`
+      INSERT INTO alerts (family_id, elder_id, alert_type, message, severity)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [a.family_id, a.elder_id, 'service_completed',
+       `Service ${a.request_code} has been completed by your caretaker. Please make the final payment to close the service.`,
+       'medium']);
+
+    res.json({ message: 'Assignment completed successfully' });
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] POST /caretaker/complete-assignment:`, err.message);
+    res.status(500).json({ error: 'Failed to complete assignment' });
+  }
 };
