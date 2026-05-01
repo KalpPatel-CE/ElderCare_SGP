@@ -19,5 +19,6 @@ router.post('/requests/:id/payment', auth, fc.updatePaymentStatus);
 router.post('/requests/:id/pay-advance', auth, fc.payAdvance);
 router.post('/requests/:id/pay-final', auth, fc.payFinal);
 router.get('/care-logs', auth, fc.getCareLogs);
+router.get('/dashboard', auth, fc.getDashboard);
 
 module.exports = router;

@@ -155,7 +155,8 @@ function AdminDashboard() {
     <div className="admin-dashboard">
       <div className="admin-sidebar">
         <div className="sidebar-header">
-          <h1 className="sidebar-logo">ElderCare</h1>
+          <img src="/logo.png" alt="ElderCare" style={{ height: '36px', width: 'auto' }} />
+          <span style={{ fontFamily: 'Lora, serif', fontSize: '1.1rem', fontWeight: '600', color: '#0D6E6E' }}>Elder Care</span>
         </div>
         <nav className="sidebar-nav">
           <button 
@@ -321,6 +322,8 @@ function AdminDashboard() {
                       <th>START</th>
                       <th>END</th>
                       <th>STATUS</th>
+                      <th>ADVANCE</th>
+                      <th>FINAL</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -333,6 +336,26 @@ function AdminDashboard() {
                         <td>{r.start_date}</td>
                         <td>{r.end_date}</td>
                         <td><StatusBadge status={r.status}>{r.status}</StatusBadge></td>
+                        <td>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600,
+                            background: r.advance_paid ? '#f0fff4' : '#fffbeb',
+                            color: r.advance_paid ? '#276749' : '#744210',
+                            border: `1px solid ${r.advance_paid ? '#9ae6b4' : '#fbd38d'}`
+                          }}>
+                            {r.advance_paid ? '✓ Paid' : '⏳ Pending'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600,
+                            background: r.final_paid ? '#f0fff4' : '#fffbeb',
+                            color: r.final_paid ? '#276749' : '#744210',
+                            border: `1px solid ${r.final_paid ? '#9ae6b4' : '#fbd38d'}`
+                          }}>
+                            {r.final_paid ? '✓ Paid' : '⏳ Pending'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -359,6 +382,8 @@ function AdminDashboard() {
                       <th>START</th>
                       <th>END</th>
                       <th>STATUS</th>
+                      <th>ADVANCE</th>
+                      <th>FINAL</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -371,6 +396,26 @@ function AdminDashboard() {
                         <td>{r.start_date}</td>
                         <td>{r.end_date}</td>
                         <td><StatusBadge status={r.status}>{r.status}</StatusBadge></td>
+                        <td>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600,
+                            background: r.advance_paid ? '#f0fff4' : '#fffbeb',
+                            color: r.advance_paid ? '#276749' : '#744210',
+                            border: `1px solid ${r.advance_paid ? '#9ae6b4' : '#fbd38d'}`
+                          }}>
+                            {r.advance_paid ? '✓ Advance Paid' : '⏳ Advance Pending'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600,
+                            background: r.final_paid ? '#f0fff4' : '#fffbeb',
+                            color: r.final_paid ? '#276749' : '#744210',
+                            border: `1px solid ${r.final_paid ? '#9ae6b4' : '#fbd38d'}`
+                          }}>
+                            {r.final_paid ? '✓ Final Paid' : '⏳ Final Pending'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

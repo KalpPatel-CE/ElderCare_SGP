@@ -304,7 +304,8 @@ function CaretakerDashboard() {
   return (
     <div className="dashboard">
       <div className="sidebar">
-        <h2>Caretaker Dashboard</h2>
+        <img src="/logo.png" alt="ElderCare" style={{ height: '32px', width: 'auto', marginBottom: '4px' }} />
+        <span style={{ fontFamily: 'Lora, serif', fontSize: '1.1rem', fontWeight: '600', color: '#0D6E6E', display: 'block', marginBottom: '16px' }}>Elder Care</span>
         <nav>
           <button onClick={() => setActiveSection('tasks')} className={activeSection === 'tasks' ? 'active' : ''}>✅ Today's Tasks</button>
           <button onClick={() => setActiveSection('elder-profile')} className={activeSection === 'elder-profile' ? 'active' : ''}>👴 Elder Profile</button>

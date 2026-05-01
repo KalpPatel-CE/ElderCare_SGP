@@ -56,7 +56,7 @@ function PaymentGateway() {
     }, 1500);
   };
 
-  const handleCancel = () => navigate('/family');
+  const handleCancel = () => navigate('/family', { state: { paymentCompleted: true } });
 
   const formatCard = (val) => {
     return val.replace(/\D/g, '').substring(0, 16).replace(/(.{4})/g, '$1 ').trim();
@@ -112,7 +112,7 @@ function PaymentGateway() {
           ) : (
             <p className="pg-next-info">✅ Service marked as complete. Thank you for choosing ElderCare!</p>
           )}
-          <button className="pg-btn-primary" onClick={() => navigate('/family')}>
+          <button className="pg-btn-primary" onClick={() => navigate('/family', { state: { paymentCompleted: true } })}>
             Return to Dashboard
           </button>
         </div>

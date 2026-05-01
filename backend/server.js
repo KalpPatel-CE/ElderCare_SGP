@@ -9,7 +9,6 @@ const authRoutes = require('./routes/auth');
 const familyRoutes = require('./routes/family');
 const caretakerRoutes = require('./routes/caretaker');
 const adminRoutes = require('./routes/admin');
-const vitalsRoutes = require('./routes/vitals');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -42,7 +41,6 @@ app.use('/auth', authRoutes);
 app.use('/family', familyRoutes);
 app.use('/caretaker', caretakerRoutes);
 app.use('/admin', adminRoutes);
-app.use('/vitals', vitalsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });

@@ -13,6 +13,24 @@
   --white: #FFFFFF;
 }
 
+/* Animated background gradient shift */
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes floatCard {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+@keyframes blobDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(20px, -15px) scale(1.05); }
+  66%       { transform: translate(-10px, 10px) scale(0.97); }
+}
+
 /* Global / Utility */
 .landing-page {
   font-family: 'DM Sans', sans-serif;
@@ -73,7 +91,8 @@
 
 .btn-primary:hover {
   background: #d4604a;
-  transform: translateX(2px);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(232,115,90,0.35);
   color: var(--white);
 }
 
@@ -87,6 +106,8 @@
 
 .btn-outline:hover {
   background-color: var(--primary-light);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(13,110,110,0.15);
 }
 
 .btn-ghost {
@@ -177,17 +198,63 @@
 
 /* 2. Hero Section */
 .hero {
-  background-color: var(--bg);
+  background: linear-gradient(135deg, #faf7f2 0%, #f5ede0 40%, #eef5f0 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 18s ease infinite;
   padding: 80px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   min-height: calc(100vh - 72px);
   gap: 40px;
+  position: relative;
+  overflow: hidden;
 }
 
+/* Organic blobs */
+.hero::before {
+  content: '';
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(13,110,110,0.07) 0%, transparent 70%);
+  border-radius: 50%;
+  top: -100px;
+  right: -80px;
+  animation: blobDrift 14s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(232,115,90,0.06) 0%, transparent 70%);
+  border-radius: 50%;
+  bottom: -60px;
+  left: 10%;
+  animation: blobDrift 20s ease-in-out infinite reverse;
+  pointer-events: none;
+}
+
+/* Radial glow behind hero text */
 .hero-left {
   width: 60%;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-left::before {
+  content: '';
+  position: absolute;
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(13,110,110,0.05) 0%, transparent 65%);
+  top: -60px;
+  left: -80px;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .hero-badge {
@@ -204,15 +271,18 @@
 
 .hero-title {
   font-size: 52px;
-  line-height: 1.1;
+  line-height: 1.12;
+  letter-spacing: -0.5px;
   margin-bottom: 24px;
 }
 
 .hero-subtitle {
   font-size: 18px;
+  line-height: 1.7;
   color: var(--text-muted);
   margin-bottom: 40px;
   max-width: 90%;
+  letter-spacing: 0.01em;
 }
 
 .hero-actions {
@@ -246,22 +316,19 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 1;
 }
 
 .mockup-card {
   background: var(--white);
   border-radius: 20px;
   padding: 32px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+  box-shadow: 0 24px 60px rgba(13,110,110,0.10), 0 4px 16px rgba(0,0,0,0.04);
   width: 100%;
   max-width: 400px;
   position: relative;
-  border: 1px solid rgba(0,0,0,0.03);
-  transition: transform 0.3s ease;
-}
-
-.mockup-card:hover {
-  transform: translateY(-8px);
+  border: 1px solid rgba(13,110,110,0.06);
+  animation: floatCard 6s ease-in-out infinite;
 }
 
 .mockup-badge {
@@ -345,6 +412,31 @@
   font-weight: 500;
 }
 
+/* Left accent strip on trust-quote */
+.trust-quote {
+  font-size: 18px;
+  font-style: italic;
+  font-family: 'Playfair Display', serif;
+  color: var(--primary);
+  border-left: 4px solid transparent;
+  border-image: linear-gradient(to bottom, #0a4040, #2db89a) 1;
+  padding-left: 20px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.trust-quote::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(to bottom, #0a4040, #2db89a);
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(13,110,110,0.4);
+}
+
 /* 3. Stats Bar */
 .stats-bar {
   background-color: var(--primary);
@@ -381,6 +473,7 @@
 
 .section-title {
   font-size: 36px;
+  letter-spacing: -0.3px;
   margin-bottom: 60px;
 }
 
@@ -476,16 +569,6 @@
 .trust-para {
   margin-bottom: 32px;
   font-size: 16px;
-}
-
-.trust-quote {
-  font-size: 18px;
-  font-style: italic;
-  font-family: 'Playfair Display', serif;
-  color: var(--primary);
-  border-left: 4px solid var(--accent);
-  padding-left: 20px;
-  margin-bottom: 20px;
 }
 
 .trust-author {

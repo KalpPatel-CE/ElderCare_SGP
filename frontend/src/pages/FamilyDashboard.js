@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
@@ -23,7 +23,13 @@ function FamilyDashboard() {
   const [showVitalsPanel, setShowVitalsPanel] = useState(false);
   const [showRequestPanel, setShowRequestPanel] = useState(false);
   const [appointments, setAppointments] = useState([]);
+  // Payment modal state
+  const [paymentModal, setPaymentModal] = useState(null); // { request, paymentType }
+  const [payMethod, setPayMethod] = useState('upi');
+  const [payProcessing, setPayProcessing] = useState(false);
+  const [paySuccess, setPaySuccess] = useState(null); // { txnId, amount, type }
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user'));
@@ -31,22 +37,25 @@ function FamilyDashboard() {
     loadData();
   }, []);
 
+  // Re-fetch when returning from PaymentGateway
+  useEffect(() => {
+    if (location.state?.paymentCompleted) {
+      loadData();
+    }
+  }, [location.key]);
+
   const loadData = async () => {
     try {
-      const [elderRes, medsRes, actsRes, vitalsRes, reqsRes, logsRes] = await Promise.all([
-        api.get('/family/elder'),
-        api.get('/family/medications'),
-        api.get('/family/activities'),
-        api.get('/family/baseline-vitals'),
-        api.get('/family/requests'),
-        api.get('/family/care-logs')
-      ]);
-      setElder(elderRes.data);
-      setMedications(medsRes.data);
-      setActivities(actsRes.data);
-      setBaselineVitals(vitalsRes.data);
-      setRequests(reqsRes.data);
-      setCareLogs(logsRes.data);
+      // Use new optimized dashboard endpoint (1 API call instead of 6)
+      const dashboardRes = await api.get('/family/dashboard');
+      const data = dashboardRes.data;
+      
+      setElder(data.elder);
+      setMedications(data.medications);
+      setActivities(data.activities);
+      setBaselineVitals(data.baseline_vitals);
+      setRequests(data.requests);
+      setCareLogs(data.care_logs);
     } catch (err) {
       console.error(err);
     }
@@ -360,6 +369,44 @@ function FamilyDashboard() {
     </>
   );
 
+  const openPaymentModal = (request, paymentType) => {
+    setPaymentModal({ request, paymentType });
+    setPayMethod('upi');
+    setPaySuccess(null);
+  };
+
+  const closePaymentModal = () => {
+    const wasSuccess = !!paySuccess;
+    setPaymentModal(null);
+    setPaySuccess(null);
+    setPayProcessing(false);
+    // Re-fetch from DB after successful payment to ensure UI matches backend
+    if (wasSuccess) loadData();
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!paymentModal) return;
+    setPayProcessing(true);
+    const { request, paymentType } = paymentModal;
+    try {
+      const res = await api.post(`/family/requests/${request.id}/payment`, { payment_type: paymentType });
+      const txnId = res.data.advance_transaction_id || res.data.final_transaction_id || 'TXN-' + Date.now();
+      const amount = Number(request.total_amount) / 2;
+      setPaySuccess({ txnId, amount, type: paymentType });
+      // Update local state immediately
+      setRequests(prev => prev.map(r => {
+        if (r.id !== request.id) return r;
+        return paymentType === 'advance'
+          ? { ...r, advance_paid: true }
+          : { ...r, final_paid: true };
+      }));
+    } catch (err) {
+      alert(err.response?.data?.error || 'Payment failed. Please try again.');
+    } finally {
+      setPayProcessing(false);
+    }
+  };
+
   const renderServiceRequest = () => (
     <>
       <section className="dashboard-section">
@@ -375,6 +422,10 @@ function FamilyDashboard() {
               {requests.map(r => {
                 const startFormatted = new Date(r.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
                 const endFormatted = new Date(r.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                const advancePaid = r.advance_paid;
+                const finalPaid = r.final_paid;
+                const totalAmt = Number(r.total_amount) || 0;
+                const halfAmt = totalAmt / 2;
                 return (
                   <div key={r.id} className="request-card">
                     <div className="request-card-header">
@@ -389,36 +440,34 @@ function FamilyDashboard() {
                         <strong>Caretaker:</strong> {r.caretaker_name} ({r.caretaker_city})
                       </div>
                     )}
-                    {r.total_amount > 0 && (
-                      <div className="payment-status-row">
-                        <span className={`pay-badge ${r.advance_paid ? 'paid' : 'pending'}`}>
-                          {r.advance_paid ? '✓ Advance Paid' : '⏳ Advance Pending'}
-                        </span>
-                        <span className={`pay-badge ${r.final_paid ? 'paid' : 'pending'}`}>
-                          {r.final_paid ? '✓ Final Paid' : '⏳ Final Pending'}
-                        </span>
-                        <span className="total-amount-badge">
-                          Total: ₹{Number(r.total_amount).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    )}
-                    {r.advance_paid && !r.final_paid && r.status === 'completed' && (
-                      <button
-                        className="pay-final-btn"
-                        onClick={() => {
-                          const finalAmount = r.total_amount / 2;
-                          navigate('/payment', {
-                            state: {
-                              requestId: r.id,
-                              amount: finalAmount,
-                              paymentType: 'final',
-                              requestCode: r.request_code,
-                              serviceDates: `${startFormatted} – ${endFormatted}`
-                            }
-                          });
-                        }}>
-                        💳 Pay Final 50% — ₹{(r.total_amount / 2).toLocaleString('en-IN')}
-                      </button>
+                    {totalAmt > 0 && (
+                      <>
+                        <div className="payment-status-row">
+                          <span className={`pay-badge ${advancePaid ? 'paid' : 'pending'}`}>
+                            {advancePaid ? '✓ Advance Paid' : '⏳ Advance Pending'}
+                          </span>
+                          <span className={`pay-badge ${finalPaid ? 'paid' : 'pending'}`}>
+                            {finalPaid ? '✓ Final Paid' : '⏳ Final Pending'}
+                          </span>
+                          <span className="total-amount-badge">Total: ₹{totalAmt.toLocaleString('en-IN')}</span>
+                        </div>
+                        {advancePaid && finalPaid ? (
+                          <div className="pay-fully-paid-badge">✅ Fully Paid</div>
+                        ) : (
+                          <div className="pay-buttons-row">
+                            {!advancePaid && (
+                              <button className="pay-action-btn pay-advance-btn" onClick={() => openPaymentModal(r, 'advance')}>
+                                💳 Pay Advance — ₹{halfAmt.toLocaleString('en-IN')}
+                              </button>
+                            )}
+                            {!finalPaid && (
+                              <button className="pay-action-btn pay-final-action-btn" onClick={() => openPaymentModal(r, 'final')}>
+                                💳 Pay Final — ₹{halfAmt.toLocaleString('en-IN')}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                     {r.status === 'cancelled' && r.rejection_reason && (
                       <div style={{ marginTop: '10px', padding: '10px', background: '#fff5f5', borderRadius: '6px', fontSize: '0.9rem', color: '#c53030' }}>
@@ -432,6 +481,85 @@ function FamilyDashboard() {
           )}
         </div>
       </section>
+
+      {/* Payment Modal */}
+      {paymentModal && (
+        <div className="pay-modal-overlay" onClick={closePaymentModal}>
+          <div className="pay-modal" onClick={e => e.stopPropagation()}>
+            {paySuccess ? (
+              <div className="pay-modal-success">
+                <div className="pay-success-icon">✓</div>
+                <h3>Payment Successful!</h3>
+                <p className="pay-success-amount">₹{paySuccess.amount.toLocaleString('en-IN')}</p>
+                <div className="pay-receipt">
+                  <div className="pay-receipt-row"><span>Transaction ID</span><span>{paySuccess.txnId}</span></div>
+                  <div className="pay-receipt-row"><span>Request</span><span>{paymentModal.request.request_code}</span></div>
+                  <div className="pay-receipt-row"><span>Type</span><span>{paySuccess.type === 'advance' ? '50% Advance' : '50% Final'}</span></div>
+                  <div className="pay-receipt-row"><span>Status</span><span className="pay-badge paid">PAID</span></div>
+                </div>
+                <button className="pay-modal-close-btn" onClick={closePaymentModal}>Close</button>
+              </div>
+            ) : (
+              <>
+                <div className="pay-modal-header">
+                  <h3>Confirm Payment</h3>
+                  <button className="pay-modal-x" onClick={closePaymentModal}>×</button>
+                </div>
+                <div className="pay-modal-body">
+                  <div className="pay-modal-summary">
+                    <div className="pay-modal-row"><span>Request</span><strong>{paymentModal.request.request_code}</strong></div>
+                    {paymentModal.request.caretaker_name && <div className="pay-modal-row"><span>Caretaker</span><strong>{paymentModal.request.caretaker_name}</strong></div>}
+                    <div className="pay-modal-row"><span>Payment Type</span><strong>{paymentModal.paymentType === 'advance' ? '50% Advance' : '50% Final'}</strong></div>
+                    <div className="pay-modal-row pay-modal-amount"><span>Amount</span><strong>₹{(Number(paymentModal.request.total_amount) / 2).toLocaleString('en-IN')}</strong></div>
+                  </div>
+                  <div className="pay-method-tabs">
+                    {['upi', 'card', 'netbanking'].map(m => (
+                      <button key={m} className={`pay-method-tab ${payMethod === m ? 'active' : ''}`} onClick={() => setPayMethod(m)}>
+                        {m === 'upi' ? '📱 UPI' : m === 'card' ? '💳 Card' : '🏦 Net Banking'}
+                      </button>
+                    ))}
+                  </div>
+                  {payMethod === 'upi' && (
+                    <div className="pay-method-form">
+                      <label>UPI ID</label>
+                      <input type="text" placeholder="yourname@upi" className="pay-input" />
+                      <div className="pay-upi-apps">
+                        {['GPay', 'PhonePe', 'Paytm', 'BHIM'].map(a => <span key={a} className="pay-upi-chip">{a}</span>)}
+                      </div>
+                    </div>
+                  )}
+                  {payMethod === 'card' && (
+                    <div className="pay-method-form">
+                      <label>Card Number</label>
+                      <input type="text" placeholder="1234 5678 9012 3456" className="pay-input" maxLength={19} />
+                      <div className="pay-form-row">
+                        <div><label>Expiry</label><input type="text" placeholder="MM/YY" className="pay-input" maxLength={5} /></div>
+                        <div><label>CVV</label><input type="password" placeholder="•••" className="pay-input" maxLength={3} /></div>
+                      </div>
+                      <label>Cardholder Name</label>
+                      <input type="text" placeholder="Name on card" className="pay-input" />
+                    </div>
+                  )}
+                  {payMethod === 'netbanking' && (
+                    <div className="pay-method-form">
+                      <label>Select Bank</label>
+                      <div className="pay-bank-grid">
+                        {['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak', 'BOB'].map(b => <div key={b} className="pay-bank-chip">{b}</div>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="pay-modal-footer">
+                  <button className="pay-confirm-btn" onClick={handleConfirmPayment} disabled={payProcessing}>
+                    {payProcessing ? 'Processing...' : `Pay ₹${(Number(paymentModal.request.total_amount) / 2).toLocaleString('en-IN')}`}
+                  </button>
+                  <button className="pay-cancel-btn" onClick={closePaymentModal}>Cancel</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 
@@ -481,7 +609,8 @@ function FamilyDashboard() {
     <div className="family-dashboard">
       <nav className="navbar">
         <div className="navbar-left">
-          <h1 className="navbar-logo">ElderCare</h1>
+          <img src="/logo.png" alt="ElderCare" style={{ height: '32px', width: 'auto' }} />
+          <span style={{ fontFamily: 'Lora, serif', fontSize: '1.1rem', fontWeight: '600', color: '#0D6E6E' }}>Elder Care</span>
           <StatusBadge status="info">Family</StatusBadge>
         </div>
         <div className="navbar-right">

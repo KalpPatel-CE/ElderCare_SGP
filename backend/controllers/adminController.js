@@ -1,5 +1,6 @@
 const pool = require('../db/db');
 const bcrypt = require('bcrypt');
+const { getCache, setCache } = require('../utils/cache');
 
 exports.getPendingRequests = async (req, res) => {
   try {
@@ -31,6 +32,7 @@ exports.getAllRequests = async (req, res) => {
       SELECT 
         cr.id, cr.request_code, cr.status, cr.start_date, cr.end_date,
         cr.service_city, cr.created_at, cr.total_amount,
+        cr.advance_paid, cr.final_paid,
         e.full_name as elder_name, e.elder_code,
         f.full_name as family_name,
         c.full_name as caretaker_name,
@@ -205,18 +207,31 @@ exports.updateBackgroundCheck = async (req, res) => {
 
 exports.getStats = async (req, res) => {
   try {
-    const [families, caretakers, pending, active] = await Promise.all([
-      pool.query('SELECT COUNT(*) FROM families'),
-      pool.query('SELECT COUNT(*) FROM caretakers'),
-      pool.query("SELECT COUNT(*) FROM caretaker_requests WHERE status='pending'"),
-      pool.query("SELECT COUNT(*) FROM service_assignments WHERE status='active'")
-    ]);
-    res.json({
-      totalFamilies: parseInt(families.rows[0].count),
-      totalCaretakers: parseInt(caretakers.rows[0].count),
-      pendingRequests: parseInt(pending.rows[0].count),
-      activeAssignments: parseInt(active.rows[0].count)
-    });
+    // Check cache first (60 seconds)
+    const cacheKey = 'admin_stats';
+    const cached = getCache(cacheKey, 60000);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const result = await pool.query(`
+      SELECT 
+        (SELECT COUNT(*) FROM families) as total_families,
+        (SELECT COUNT(*) FROM caretakers) as total_caretakers,
+        (SELECT COUNT(*) FROM caretaker_requests WHERE status='pending') as pending_requests,
+        (SELECT COUNT(*) FROM service_assignments WHERE status='active') as active_assignments
+    `);
+    
+    const data = {
+      totalFamilies: parseInt(result.rows[0].total_families),
+      totalCaretakers: parseInt(result.rows[0].total_caretakers),
+      pendingRequests: parseInt(result.rows[0].pending_requests),
+      activeAssignments: parseInt(result.rows[0].active_assignments)
+    };
+
+    // Cache for 60 seconds
+    setCache(cacheKey, data);
+    res.json(data);
   } catch (err) {
     console.error(`[${new Date().toISOString()}] GET /admin/stats:`, err.message);
     res.status(500).json({ error: 'Failed' });

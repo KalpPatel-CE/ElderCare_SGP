@@ -27,17 +27,15 @@ exports.getAssignment = async (req, res) => {
 
 exports.getElderMedications = async (req, res) => {
   try {
-    const assignment = await pool.query(`
-      SELECT sa.id, cr.elder_id FROM service_assignments sa
-      JOIN caretaker_requests cr ON cr.id = sa.request_id
-      WHERE sa.caretaker_id = $1 AND sa.status = 'active'
-      ORDER BY sa.assigned_at DESC LIMIT 1
+    const result = await pool.query(`
+      SELECT m.*
+      FROM medications m
+      JOIN elders e ON e.id = m.elder_id
+      JOIN caretaker_requests cr ON cr.elder_id = e.id
+      JOIN service_assignments sa ON sa.request_id = cr.id
+      WHERE sa.caretaker_id = $1 AND sa.status = 'active' AND m.is_active = true
+      ORDER BY m.created_at DESC
     `, [req.user.id]);
-    if (!assignment.rows[0]) return res.json([]);
-    const result = await pool.query(
-      'SELECT * FROM medications WHERE elder_id = $1 AND is_active = true',
-      [assignment.rows[0].elder_id]
-    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -47,17 +45,15 @@ exports.getElderMedications = async (req, res) => {
 
 exports.getElderActivities = async (req, res) => {
   try {
-    const assignment = await pool.query(`
-      SELECT sa.id, cr.elder_id FROM service_assignments sa
-      JOIN caretaker_requests cr ON cr.id = sa.request_id
+    const result = await pool.query(`
+      SELECT a.*
+      FROM activities a
+      JOIN elders e ON e.id = a.elder_id
+      JOIN caretaker_requests cr ON cr.elder_id = e.id
+      JOIN service_assignments sa ON sa.request_id = cr.id
       WHERE sa.caretaker_id = $1 AND sa.status = 'active'
-      ORDER BY sa.assigned_at DESC LIMIT 1
+      ORDER BY a.created_at DESC
     `, [req.user.id]);
-    if (!assignment.rows[0]) return res.json([]);
-    const result = await pool.query(
-      'SELECT * FROM activities WHERE elder_id = $1',
-      [assignment.rows[0].elder_id]
-    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -67,16 +63,13 @@ exports.getElderActivities = async (req, res) => {
 
 exports.getElderAppointments = async (req, res) => {
   try {
-    const assignment = await pool.query(`
-      SELECT sa.id, sa.request_id FROM service_assignments sa
+    const result = await pool.query(`
+      SELECT ap.*
+      FROM appointments ap
+      JOIN service_assignments sa ON sa.request_id = ap.request_id
       WHERE sa.caretaker_id = $1 AND sa.status = 'active'
-      ORDER BY sa.assigned_at DESC LIMIT 1
+      ORDER BY ap.appointment_time ASC
     `, [req.user.id]);
-    if (!assignment.rows[0]) return res.json([]);
-    const result = await pool.query(
-      `SELECT * FROM appointments WHERE request_id = $1 ORDER BY appointment_time ASC`,
-      [assignment.rows[0].request_id]
-    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
