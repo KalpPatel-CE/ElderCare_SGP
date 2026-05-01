@@ -46,7 +46,6 @@ function FamilyDashboard() {
 
   const loadData = async () => {
     try {
-      // Use new optimized dashboard endpoint (1 API call instead of 6)
       const dashboardRes = await api.get('/family/dashboard');
       const data = dashboardRes.data;
       
@@ -54,7 +53,12 @@ function FamilyDashboard() {
       setMedications(data.medications);
       setActivities(data.activities);
       setBaselineVitals(data.baseline_vitals);
-      setRequests(data.requests);
+      
+      // Deduplicate requests by ID
+      const uniqueRequests = Array.from(
+        new Map(data.requests.map(r => [r.id, r])).values()
+      );
+      setRequests(uniqueRequests);
       setCareLogs(data.care_logs);
     } catch (err) {
       console.error(err);
@@ -233,8 +237,8 @@ function FamilyDashboard() {
                 <EmptyState message="No events scheduled for today" />
               ) : (
                 <>
-                  {medications.map((med, idx) => (
-                    <div key={`med-${idx}`} className="timeline-row">
+                  {medications.map((med) => (
+                    <div key={`med-${med.id}`} className="timeline-row">
                       <div className="timeline-time">09:00</div>
                       <div className="timeline-icon timeline-icon-medication">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -248,8 +252,8 @@ function FamilyDashboard() {
                       <StatusBadge status={med.status || 'pending'}>{med.status || 'Pending'}</StatusBadge>
                     </div>
                   ))}
-                  {activities.map((act, idx) => (
-                    <div key={`act-${idx}`} className="timeline-row">
+                  {activities.map((act) => (
+                    <div key={`act-${act.id}`} className="timeline-row">
                       <div className="timeline-time">{act.preferred_time || '14:00'}</div>
                       <div className="timeline-icon timeline-icon-activity">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -572,8 +576,8 @@ function FamilyDashboard() {
             <EmptyState message="No care logs available yet" />
           ) : (
             <div className="care-logs">
-              {careLogs.map((log, idx) => (
-                <div key={idx} className="care-log-card">
+              {careLogs.map((log) => (
+                <div key={log.id} className="care-log-card">
                   <div className="care-log-header">
                     <div className="care-log-date">{new Date(log.log_date).toLocaleDateString()}</div>
                     <div className="care-log-caretaker">{log.caretaker_name}</div>
@@ -867,18 +871,16 @@ function FamilyDashboard() {
           </div>
           <div className="form-section-header">
             APPOINTMENTS
-            <button type="button" className="btn-ghost-sm" onClick={() => setAppointments([...appointments, {}])}>+ Add appointment</button>
+            <button type="button" className="btn-ghost-sm" onClick={() => setAppointments([...appointments, { _tempId: Date.now() + Math.random() }])}>+ Add appointment</button>
           </div>
-          {appointments.map((apt, idx) => (
+          {appointments.map((apt) => (
             <AppointmentEntry
-              key={idx}
+              key={apt._tempId || apt.id}
               appointment={apt}
               onChange={(updated) => {
-                const newApts = [...appointments];
-                newApts[idx] = updated;
-                setAppointments(newApts);
+                setAppointments(prev => prev.map(a => a._tempId === apt._tempId ? updated : a));
               }}
-              onRemove={() => setAppointments(appointments.filter((_, i) => i !== idx))}
+              onRemove={() => setAppointments(appointments.filter(a => a._tempId !== apt._tempId))}
             />
           ))}
           <div className="slide-panel-actions">

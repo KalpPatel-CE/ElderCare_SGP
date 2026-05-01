@@ -142,7 +142,7 @@ exports.saveBaselineVitals = async (req, res) => {
 exports.getRequests = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT DISTINCT ON (cr.id)
         cr.id, cr.request_code, cr.family_id, cr.elder_id, cr.start_date, 
         cr.end_date, cr.status, cr.special_requirements, cr.service_address, 
         cr.service_city, cr.created_at, cr.total_amount,
@@ -157,7 +157,7 @@ exports.getRequests = async (req, res) => {
       LEFT JOIN service_assignments sa ON sa.request_id = cr.id
       LEFT JOIN caretakers c ON c.id = sa.caretaker_id
       WHERE cr.family_id=$1
-      ORDER BY cr.created_at DESC
+      ORDER BY cr.id, cr.created_at DESC
       LIMIT 50
     `, [req.user.id]);
     res.json(result.rows);
@@ -400,7 +400,7 @@ exports.getDashboard = async (req, res) => {
                LIMIT 30) cl) AS care_logs,
         
         (SELECT COALESCE(json_agg(r.*), '[]'::json)
-         FROM (SELECT 
+         FROM (SELECT DISTINCT ON (cr.id)
                  cr.id, cr.request_code, cr.family_id, cr.elder_id, cr.start_date, 
                  cr.end_date, cr.status, cr.special_requirements, cr.service_address, 
                  cr.service_city, cr.created_at, cr.total_amount,
@@ -415,7 +415,7 @@ exports.getDashboard = async (req, res) => {
                LEFT JOIN service_assignments sa ON sa.request_id = cr.id
                LEFT JOIN caretakers c ON c.id = sa.caretaker_id
                WHERE cr.elder_id = e.id
-               ORDER BY cr.created_at DESC
+               ORDER BY cr.id, cr.created_at DESC
                LIMIT 50) r) AS requests,
         
         (SELECT row_to_json(bv.*) 
