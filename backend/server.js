@@ -16,12 +16,13 @@ const PORT = process.env.PORT || 5000;
 app.use(compression());
 const cors = require("cors");
 
-  app.use(cors({
-    origin: [
-      "http://localhost:3000",
-      "https://elder-care-sgp-k2z9.vercel.app"
-    ],
-    credentials: true
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "https://elder-care-sgp-k2z9.vercel.app"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 
